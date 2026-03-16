@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Database (created in user vaults)
+.zk/
+
+# macOS
+.DS_Store
+
+# Obsidian (if testing as vault)
+.obsidian/
+.smart-env/
+.serena/
+
+# Vault note folders (created by ozc init, not part of package)
+1-Fleeting/
+2-Literature/
+3-Permanent/
+4-MOC/
+5-Projects/
+Archive/
+Attachments/
+
+# Claude memory
+.claude/
+

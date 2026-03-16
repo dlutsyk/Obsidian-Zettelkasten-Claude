@@ -1,0 +1,38 @@
+{
+  "name": "obsidian-zk",
+  "version": "0.1.1",
+  "description": "Obsidian Zettelkasten MCP server with Luhmann numbering",
+  "type": "module",
+  "bin": {
+    "obsidian-zk": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "obsidian",
+    "zettelkasten",
+    "mcp",
+    "luhmann"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "better-sqlite3": "^11.8.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ]
+}

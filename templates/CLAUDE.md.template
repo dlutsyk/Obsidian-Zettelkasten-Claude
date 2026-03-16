@@ -1,0 +1,59 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Obsidian vault implementing Luhmann's Zettelkasten. {{language}}-language notes. AI-assisted via Claude Code skills and OZC MCP server.
+
+Core rule: one permanent note = one atomic idea. Value is in connections between notes, not notes alone.
+
+## MCP Server (OZC)
+
+The vault uses the `ozc` MCP server for all Zettelkasten operations. Tools are auto-discovered by Claude Code.
+
+### Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `zk_capture` | Create fleeting note |
+| `zk_literature` | Create literature note from source |
+| `zk_permanent` | Create permanent note with Luhmann ID |
+| `zk_manage` | Edit/archive/delete by ID |
+| `zk_promote` | Mark fleeting as processed |
+| `zk_find_connections` | Find connection candidates |
+| `zk_cluster_detect` | Find emerging themes |
+| `zk_list` | List/filter notes |
+| `zk_unprocessed` | Find unprocessed notes |
+| `zk_orphans` | Find orphan notes |
+| `zk_next_id` | Next Luhmann ID |
+| `zk_find_by_id` | Resolve ID to path |
+| `zk_list_ids` | All numbered notes |
+| `zk_review` | Full vault health report |
+| `zk_reindex` | Re-scan vault |
+| `zk_status` | DB stats |
+
+### Available Prompts (Slash Commands)
+
+`/zk:capture`, `/zk:literature`, `/zk:permanent`, `/zk:promote`, `/zk:manage`, `/zk:review`, `/zk:daily`, `/zk:connect`, `/zk:reflect`
+
+## Note folders & lifecycle
+
+- `1-Fleeting/` — raw ideas (status: unprocessed → processed)
+- `2-Literature/` — source notes (status: unprocessed → processed)
+- `3-Permanent/` — atomic ideas with Luhmann IDs (status: draft → finalized)
+- `4-MOC/` — Maps of Content (topic indexes)
+- `5-Projects/` — active goals
+- `Archive/` — cold storage
+
+## Luhmann numbering
+
+`zk_id` in permanent note frontmatter: `1, 2, 3` (top-level) → `1a, 1b` (branches) → `1a1, 1a2` (sub-branches). Alternating numbers/letters.
+
+## Connection types (Ukrainian)
+
+- **Підтримує** (Supports), **Суперечить** (Contradicts), **Розширює** (Extends), **Пов'язано** (Related)
+
+## Language
+
+All note content, section headers, and connection types in Ukrainian.
