@@ -5,7 +5,7 @@ import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
-import { CREATE_TABLES, SCHEMA_VERSION, MIGRATIONS } from "./schema.js";
+import { CREATE_TABLES, SCHEMA_VERSION } from "./schema.js";
 import { scanVault } from "../vault/scanner.js";
 import { parseFrontmatter, getBody, getTags, getWikilinks } from "../vault/parser.js";
 import type { Frontmatter } from "../vault/parser.js";
@@ -63,23 +63,7 @@ export class ZkDatabase {
     this.db.pragma("journal_mode = WAL");
     this.db.exec(CREATE_TABLES);
 
-    // Schema migration
-    const row = this.db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string } | undefined;
-    const currentVersion = row ? parseInt(row.value, 10) : 1;
-
-    if (currentVersion < SCHEMA_VERSION) {
-      for (let v = currentVersion + 1; v <= SCHEMA_VERSION; v++) {
-        const stmts = MIGRATIONS[v];
-        if (stmts) {
-          for (const sql of stmts) this.db.exec(sql);
-        }
-      }
-      this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
-      // Force full reindex after migration to rebuild path-based links
-      this.reindex();
-    } else {
-      this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
-    }
+    this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
   }
 
   resolveWikilink(title: string): string | null {
