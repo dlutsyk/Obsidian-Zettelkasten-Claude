@@ -38,7 +38,7 @@ export function zkClusterDetect(db: ZkDatabase) {
     }
   }
 
-  // Find clusters of 3+ notes sharing a tag, not covered by MOC
+  // Check if each cluster already has a MOC — suggests the topic is already organized
   const mocs = db.db.prepare("SELECT title FROM notes WHERE type = 'moc'").all() as { title: string }[];
   const mocTitles = new Set(mocs.map((m) => m.title.toLowerCase()));
 

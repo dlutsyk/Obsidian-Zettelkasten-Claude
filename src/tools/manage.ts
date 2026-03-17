@@ -15,6 +15,7 @@ export function zkListIds(db: ZkDatabase) {
     "SELECT zk_id, title, status, path FROM notes WHERE zk_id IS NOT NULL AND zk_id != '' ORDER BY zk_id"
   ).all() as { zk_id: string; title: string; status: string; path: string }[];
 
+  // SQL ORDER BY can't sort Luhmann IDs correctly (1a before 2, 1a1 before 1b) — need custom comparator
   rows.sort((a, b) => compareLuhmannIds(a.zk_id, b.zk_id));
 
   return rows.map((r) => ({
@@ -63,6 +64,7 @@ export function zkDeleteNote(db: ZkDatabase, zkId: string) {
   if (!note) return { error: `Note with ID ${zkId} not found` };
 
   const fullPath = join(db.vaultRoot, note.path);
+  // Guard: refuse deletion if other notes link here — would create broken wikilinks
   const incomingLinks = db.getLinksTo(note.title);
 
   if (incomingLinks.length > 0) {

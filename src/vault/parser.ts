@@ -29,6 +29,8 @@ export function parseFrontmatter(filePath: string): Frontmatter {
 
   const fmText = text.slice(4, end);
   const fm: Frontmatter = {};
+  // State machine for multi-line YAML arrays: currentKey tracks which field
+  // we're parsing, currentList accumulates "- item" lines until the next key.
   let currentKey: string | null = null;
   let currentList: string[] | null = null;
 
@@ -85,6 +87,7 @@ export function getWikilinks(filePath: string): Set<string> {
   const matches = text.matchAll(/\[\[([^\]]+)\]\]/g);
   const links = new Set<string>();
   for (const m of matches) {
+    // Strip alias: [[title|alias]] → title
     links.add(m[1].split("|")[0]);
   }
   return links;

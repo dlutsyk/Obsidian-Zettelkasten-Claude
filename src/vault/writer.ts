@@ -18,7 +18,7 @@ function serializeFrontmatter(fm: Frontmatter): string {
         }
       }
     } else {
-      // Quote values that contain special chars
+      // Quote values containing YAML special chars to prevent parse errors
       const needsQuote = /[:#\[\]{}|>&*!%@`]/.test(val) || val === "";
       lines.push(`${key}: ${needsQuote ? `"${val}"` : val}`);
     }
@@ -45,13 +45,12 @@ export function updateFrontmatterField(filePath: string, key: string, value: str
   const fmSection = text.slice(0, end + 4);
   const body = text.slice(end + 4);
 
-  // Simple regex replacement for single-value fields
+  // Two cases: replace existing field in-place, or insert new field before closing ---
   const re = new RegExp(`^${key}:.*$`, "m");
   let newFm: string;
   if (re.test(fmSection)) {
     newFm = fmSection.replace(re, `${key}: ${value}`);
   } else {
-    // Insert before closing ---
     newFm = fmSection.slice(0, end) + `\n${key}: ${value}` + fmSection.slice(end);
   }
   writeFileSync(filePath, newFm + body, "utf-8");

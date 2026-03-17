@@ -2,6 +2,8 @@
  * Luhmann ID generation and sorting.
  */
 
+// Alternating branching: digits branch into letters, letters into digits.
+// 1 → 1a → 1a1 → 1a1a — each level alternates to create a hierarchical address.
 export function nextId(existingIds: Set<string>, parentId?: string): string {
   if (!parentId) {
     // Next top-level integer
@@ -30,6 +32,7 @@ export function nextId(existingIds: Set<string>, parentId?: string): string {
   throw new Error(`No available ID under ${parentId}`);
 }
 
+// Split ID into alternating segments for comparison: "12ab3" → [12, "ab", 3]
 export function luhmannSortKey(id: string): (string | number)[] {
   const parts = id.match(/(\d+|[a-z]+)/g) ?? [];
   return parts.map((p) => (/^\d+$/.test(p) ? parseInt(p, 10) : p));
@@ -48,7 +51,7 @@ export function compareLuhmannIds(a: string, b: string): number {
     } else if (typeof va === "string" && typeof vb === "string") {
       if (va !== vb) return va < vb ? -1 : 1;
     } else {
-      // number before string
+      // Mixed types: numbers sort before strings (1a < 1a1a at same depth)
       return typeof va === "number" ? -1 : 1;
     }
   }

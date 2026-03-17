@@ -25,14 +25,16 @@ export function createServer(vaultRoot: string): McpServer {
 
   // === CORE CRUD TOOLS ===
 
-  server.tool(
+  server.registerTool(
     "zk_capture",
-    "Create a fleeting note from a raw thought",
     {
-      title: z.string().describe("Ukrainian title — short phrase"),
-      thought: z.string().describe("The raw thought or observation"),
-      context: z.string().optional().describe("What triggered this thought"),
-      tags: z.array(z.string()).optional().describe("Tags beyond 'fleeting'"),
+      description: "Create a fleeting note from a raw thought",
+      inputSchema: {
+        title: z.string().describe("Ukrainian title — short phrase"),
+        thought: z.string().describe("The raw thought or observation"),
+        context: z.string().optional().describe("What triggered this thought"),
+        tags: z.array(z.string()).optional().describe("Tags beyond 'fleeting'"),
+      },
     },
     async (args) => {
       const result = zkCapture(db, args);
@@ -40,23 +42,25 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_literature",
-    "Create a literature note from a source (book, article, video, podcast)",
     {
-      title: z.string().describe("Ukrainian title for the note"),
-      source_type: z.string().describe("книга|стаття|відео|подкаст"),
-      source_title: z.string().describe("Original source title"),
-      source_author: z.string().describe("Author name"),
-      source_url: z.string().optional(),
-      source_year: z.string().optional(),
-      summary: z.string().describe("2-3 sentence summary in Ukrainian"),
-      key_ideas: z.array(z.string()).describe("Key ideas from the source"),
-      quotes: z.array(z.string()).optional(),
-      interpretation: z.string().optional(),
-      takeaways: z.array(z.string()).optional(),
-      tags: z.array(z.string()).optional(),
-      connections: z.array(z.object({ target: z.string(), type: z.string() })).optional(),
+      description: "Create a literature note from a source (book, article, video, podcast)",
+      inputSchema: {
+        title: z.string().describe("Ukrainian title for the note"),
+        source_type: z.string().describe("книга|стаття|відео|подкаст"),
+        source_title: z.string().describe("Original source title"),
+        source_author: z.string().describe("Author name"),
+        source_url: z.string().optional(),
+        source_year: z.string().optional(),
+        summary: z.string().describe("2-3 sentence summary in Ukrainian"),
+        key_ideas: z.array(z.string()).describe("Key ideas from the source"),
+        quotes: z.array(z.string()).optional(),
+        interpretation: z.string().optional(),
+        takeaways: z.array(z.string()).optional(),
+        tags: z.array(z.string()).optional(),
+        connections: z.array(z.object({ target: z.string(), type: z.string() })).optional(),
+      },
     },
     async (args) => {
       const result = zkLiterature(db, args);
@@ -64,21 +68,23 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_permanent",
-    "Create an atomic permanent note with Luhmann ID",
     {
-      title: z.string().describe("Ukrainian phrase that IS the idea"),
-      claim: z.string().describe("One-sentence atomic claim"),
-      elaboration: z.string().describe("Explanation of the idea"),
-      evidence: z.array(z.string()).optional(),
-      counterpoints: z.array(z.string()).optional(),
-      origin: z.string().optional().describe("Source reference (wikilink to fleeting/literature note)"),
-      confidence: z.enum(["low", "medium", "high"]),
-      parent_id: z.string().optional().describe("Parent Luhmann ID to branch from"),
-      tags: z.array(z.string()).optional(),
-      connections: z.array(z.object({ target: z.string(), type: z.string() })).optional(),
-      source_fleeting_path: z.string().optional().describe("Path of source fleeting note to mark as processed"),
+      description: "Create an atomic permanent note with Luhmann ID",
+      inputSchema: {
+        title: z.string().describe("Ukrainian phrase that IS the idea"),
+        claim: z.string().describe("One-sentence atomic claim"),
+        elaboration: z.string().describe("Explanation of the idea"),
+        evidence: z.array(z.string()).optional(),
+        counterpoints: z.array(z.string()).optional(),
+        origin: z.string().optional().describe("Source reference (wikilink to fleeting/literature note)"),
+        confidence: z.enum(["low", "medium", "high"]),
+        parent_id: z.string().optional().describe("Parent Luhmann ID to branch from"),
+        tags: z.array(z.string()).optional(),
+        connections: z.array(z.object({ target: z.string(), type: z.string() })).optional(),
+        source_fleeting_path: z.string().optional().describe("Path of source fleeting note to mark as processed"),
+      },
     },
     async (args) => {
       const result = zkPermanent(db, args);
@@ -86,13 +92,15 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_manage",
-    "Edit/archive/delete a note by Luhmann ID",
     {
-      zk_id: z.string().describe("Luhmann ZK ID"),
-      action: z.enum(["find", "edit", "archive", "delete"]),
-      updates: z.record(z.string(), z.string()).optional().describe("Frontmatter fields to update (for edit action)"),
+      description: "Edit/archive/delete a note by Luhmann ID",
+      inputSchema: {
+        zk_id: z.string().describe("Luhmann ZK ID"),
+        action: z.enum(["find", "edit", "archive", "delete"]),
+        updates: z.record(z.string(), z.string()).optional().describe("Frontmatter fields to update (for edit action)"),
+      },
     },
     async (args) => {
       let result: any;
@@ -114,11 +122,13 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_promote",
-    "Mark a fleeting note as processed",
     {
-      note_path: z.string().describe("Relative path to the fleeting note"),
+      description: "Mark a fleeting note as processed",
+      inputSchema: {
+        note_path: z.string().describe("Relative path to the fleeting note"),
+      },
     },
     async (args) => {
       const { updateFrontmatterField } = await import("../vault/writer.js");
@@ -132,12 +142,14 @@ export function createServer(vaultRoot: string): McpServer {
 
   // === SEARCH & CONNECTIONS ===
 
-  server.tool(
+  server.registerTool(
     "zk_find_connections",
-    "Find connection candidates for a note by tags + links + keywords",
     {
-      note_path: z.string().optional().describe("Relative path to the note"),
-      note_title: z.string().optional().describe("Note title (alternative to path)"),
+      description: "Find connection candidates for a note by tags + links + keywords",
+      inputSchema: {
+        note_path: z.string().optional().describe("Relative path to the note"),
+        note_title: z.string().optional().describe("Note title (alternative to path)"),
+      },
     },
     async (args) => {
       const result = zkFindConnections(db, args);
@@ -145,10 +157,12 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_cluster_detect",
-    "Find emerging themes — groups of notes sharing tags without a MOC",
-    {},
+    {
+      description: "Find emerging themes — groups of notes sharing tags without a MOC",
+      inputSchema: {},
+    },
     async () => {
       const result = zkClusterDetect(db);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -157,13 +171,15 @@ export function createServer(vaultRoot: string): McpServer {
 
   // === VAULT ANALYSIS ===
 
-  server.tool(
+  server.registerTool(
     "zk_list",
-    "List/filter notes by type, status, or folder",
     {
-      type: z.string().optional(),
-      status: z.string().optional(),
-      folder: z.string().optional(),
+      description: "List/filter notes by type, status, or folder",
+      inputSchema: {
+        type: z.string().optional(),
+        status: z.string().optional(),
+        folder: z.string().optional(),
+      },
     },
     async (args) => {
       db.reindex();
@@ -172,11 +188,13 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_unprocessed",
-    "Find notes needing processing (unprocessed/draft status)",
     {
-      type: z.string().optional().describe("Filter by type: fleeting, literature, permanent"),
+      description: "Find notes needing processing (unprocessed/draft status)",
+      inputSchema: {
+        type: z.string().optional().describe("Filter by type: fleeting, literature, permanent"),
+      },
     },
     async (args) => {
       const result = zkUnprocessed(db, args);
@@ -184,11 +202,13 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_orphans",
-    "Find notes with no incoming links",
     {
-      folder: z.string().optional().describe("Filter by folder, e.g. '3-Permanent'"),
+      description: "Find notes with no incoming links",
+      inputSchema: {
+        folder: z.string().optional().describe("Filter by folder, e.g. '3-Permanent'"),
+      },
     },
     async (args) => {
       const result = zkOrphans(db, args);
@@ -196,11 +216,13 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_next_id",
-    "Generate next available Luhmann ID",
     {
-      parent_id: z.string().optional().describe("Parent ID to branch from"),
+      description: "Generate next available Luhmann ID",
+      inputSchema: {
+        parent_id: z.string().optional().describe("Parent ID to branch from"),
+      },
     },
     async (args) => {
       db.reindex();
@@ -210,11 +232,13 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_find_by_id",
-    "Resolve Luhmann ID to file path",
     {
-      zk_id: z.string(),
+      description: "Resolve Luhmann ID to file path",
+      inputSchema: {
+        zk_id: z.string(),
+      },
     },
     async (args) => {
       const result = zkFindById(db, args.zk_id);
@@ -222,10 +246,12 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_list_ids",
-    "List all numbered permanent notes with Luhmann IDs",
-    {},
+    {
+      description: "List all numbered permanent notes with Luhmann IDs",
+      inputSchema: {},
+    },
     async () => {
       db.reindex();
       const result = zkListIds(db);
@@ -233,10 +259,12 @@ export function createServer(vaultRoot: string): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_review",
-    "Full vault health report — unprocessed, orphans, stats",
-    {},
+    {
+      description: "Full vault health report — unprocessed, orphans, stats",
+      inputSchema: {},
+    },
     async () => {
       const result = zkReview(db);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -245,20 +273,24 @@ export function createServer(vaultRoot: string): McpServer {
 
   // === INDEX MANAGEMENT ===
 
-  server.tool(
+  server.registerTool(
     "zk_reindex",
-    "Full vault re-scan and DB update",
-    {},
+    {
+      description: "Full vault re-scan and DB update",
+      inputSchema: {},
+    },
     async () => {
       const result = zkReindex(db);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );
 
-  server.tool(
+  server.registerTool(
     "zk_status",
-    "DB stats and last index time",
-    {},
+    {
+      description: "DB stats and last index time",
+      inputSchema: {},
+    },
     async () => {
       const result = zkStatus(db);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
@@ -267,10 +299,12 @@ export function createServer(vaultRoot: string): McpServer {
 
   // === MCP PROMPTS ===
 
-  server.prompt(
+  server.registerPrompt(
     "zk-capture",
-    "Capture a quick thought as a fleeting note",
-    { thought: z.string().optional().describe("The thought to capture") },
+    {
+      description: "Capture a quick thought as a fleeting note",
+      argsSchema: { thought: z.string().optional().describe("The thought to capture") },
+    },
     (args) => ({
       messages: [{
         role: "user" as const,
@@ -297,10 +331,12 @@ ${args.thought ? `Thought: ${args.thought}` : "Ask me for the thought to capture
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-literature",
-    "Create a literature note from a source",
-    { content: z.string().optional().describe("Pasted source content") },
+    {
+      description: "Create a literature note from a source",
+      argsSchema: { content: z.string().optional().describe("Pasted source content") },
+    },
     (args) => ({
       messages: [{
         role: "user" as const,
@@ -329,10 +365,12 @@ ${args.content ? `Source content:\n${args.content}` : "Please paste the source c
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-permanent",
-    "Create an atomic permanent note with connections",
-    { idea: z.string().optional().describe("The idea to formulate") },
+    {
+      description: "Create an atomic permanent note with connections",
+      argsSchema: { idea: z.string().optional().describe("The idea to formulate") },
+    },
     (args) => ({
       messages: [{
         role: "user" as const,
@@ -364,10 +402,12 @@ ${args.idea ? `Idea: ${args.idea}` : "What idea should I formulate?"}
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-promote",
-    "Convert fleeting notes to permanent",
-    { note: z.string().optional().describe("Fleeting note name to promote") },
+    {
+      description: "Convert fleeting notes to permanent",
+      argsSchema: { note: z.string().optional().describe("Fleeting note name to promote") },
+    },
     (args) => ({
       messages: [{
         role: "user" as const,
@@ -397,10 +437,12 @@ ${args.note ? `Note: ${args.note}` : "Use `zk_unprocessed` with type=fleeting to
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-manage",
-    "Edit/delete/archive notes by Luhmann number",
-    { command: z.string().optional().describe("e.g., 'edit 3a', 'archive 7', 'list ids'") },
+    {
+      description: "Edit/delete/archive notes by Luhmann number",
+      argsSchema: { command: z.string().optional().describe("e.g., 'edit 3a', 'archive 7', 'list ids'") },
+    },
     (args) => ({
       messages: [{
         role: "user" as const,
@@ -426,10 +468,12 @@ ${args.command ? `Command: ${args.command}` : "What would you like to do? (list 
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-review",
-    "Vault health — unprocessed, orphans, stats",
-    {},
+    {
+      description: "Vault health — unprocessed, orphans, stats",
+      argsSchema: {},
+    },
     () => ({
       messages: [{
         role: "user" as const,
@@ -454,10 +498,12 @@ Use \`zk_review\` for the full report. Present:
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-daily",
-    "Morning briefing — what needs attention today",
-    {},
+    {
+      description: "Morning briefing — what needs attention today",
+      argsSchema: {},
+    },
     () => ({
       messages: [{
         role: "user" as const,
@@ -477,10 +523,12 @@ Present as a concise Ukrainian-language briefing with specific action suggestion
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-connect",
-    "Find and create connections for a specific note",
-    { note: z.string().optional().describe("Note title or ID") },
+    {
+      description: "Find and create connections for a specific note",
+      argsSchema: { note: z.string().optional().describe("Note title or ID") },
+    },
     (args) => ({
       messages: [{
         role: "user" as const,
@@ -507,10 +555,12 @@ ${args.note ? `Note: ${args.note}` : "Which note should I find connections for?"
     })
   );
 
-  server.prompt(
+  server.registerPrompt(
     "zk-reflect",
-    "Deep reflection on vault themes and gaps",
-    {},
+    {
+      description: "Deep reflection on vault themes and gaps",
+      argsSchema: {},
+    },
     () => ({
       messages: [{
         role: "user" as const,

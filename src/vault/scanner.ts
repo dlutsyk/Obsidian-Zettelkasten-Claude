@@ -4,6 +4,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, relative, extname } from "node:path";
 
+// Skip non-note dirs (config, tooling) and meta files that aren't zettelkasten notes
 const SKIP_DIRS = new Set(["Templates", ".obsidian", ".claude", ".zk", "node_modules", ".git"]);
 const SKIP_FILES = new Set(["CLAUDE.md", "Home.md", "README.md"]);
 

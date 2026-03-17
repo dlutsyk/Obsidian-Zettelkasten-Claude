@@ -19,6 +19,7 @@ export class ZkDatabase {
     if (!existsSync(dbDir)) mkdirSync(dbDir, { recursive: true });
     const dbPath = join(dbDir, "zettelkasten.db");
     this.db = new Database(dbPath);
+    // WAL mode: allows concurrent reads during writes, better for indexing while serving queries
     this.db.pragma("journal_mode = WAL");
     this.db.exec(CREATE_TABLES);
     this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
@@ -58,6 +59,7 @@ export class ZkDatabase {
           continue;
         }
 
+        // Incremental indexing: skip files whose content hash hasn't changed
         const hash = createHash("md5").update(content).digest("hex");
         const existing = getHash.get(note.relPath) as { content_hash: string } | undefined;
         if (existing?.content_hash === hash) continue;
@@ -83,7 +85,7 @@ export class ZkDatabase {
           hash
         );
 
-        // Update links
+        // Fully delete+reinsert links — simplest way to handle removed wikilinks
         deleteLinks.run(note.relPath);
         const wikilinks = getWikilinks(fullPath);
         for (const target of wikilinks) {
@@ -147,7 +149,7 @@ export class ZkDatabase {
   }
 
   getOrphans(folder?: string) {
-    // Notes with no incoming links
+    // LEFT JOIN + NULL: notes where no link row matched = no incoming links
     let sql = `
       SELECT n.* FROM notes n
       LEFT JOIN links l ON l.target = n.title
@@ -182,18 +184,19 @@ export class ZkDatabase {
       let score = 0;
       const reasons: string[] = [];
 
-      // Shared tags
+      // Scoring: shared tags worth 2pts each, keyword overlap 1pt each.
       const otherTags = JSON.parse(other.tags || "[]") as string[];
       const shared = noteTags.filter((t) => otherTags.includes(t));
       score += shared.length * 2;
       reasons.push(...shared.map((t) => `tag:${t}`));
 
-      // Keyword overlap in summary
+      // 4-char minimum filters stopwords; Ukrainian+Latin regex covers both languages
       const noteWords = new Set((note.summary || "").toLowerCase().match(/[а-яієїґa-z]{4,}/g) ?? []);
       const otherWords = (other.summary || "").toLowerCase().match(/[а-яієїґa-z]{4,}/g) ?? [];
       const kwMatches = otherWords.filter((w: string) => noteWords.has(w)).length;
       score += kwMatches;
 
+      // Threshold ≥2 filters noise (single keyword match alone not enough)
       if (score >= 2) {
         candidates.push({ path: other.path, title: other.title, score, reasons, summary: other.summary || "", type: other.type || "" });
       }
