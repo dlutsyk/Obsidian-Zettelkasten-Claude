@@ -37,9 +37,12 @@ export function scanVault(vaultRoot: string, folder?: string): VaultNote[] {
           walk(full);
         }
       } else if (extname(entry) === ".md" && !SKIP_FILES.has(entry)) {
+        const rel = relative(vaultRoot, full);
+        // Skip vault-root .md files — they're not ZK notes
+        if (!rel.includes("/") && !rel.includes("\\")) continue;
         notes.push({
           path: full,
-          relPath: relative(vaultRoot, full),
+          relPath: rel,
         });
       }
     }

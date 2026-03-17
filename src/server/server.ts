@@ -33,7 +33,7 @@ export function createServer(vaultRoot: string): McpServer {
     {
       description: "Create a fleeting note from a raw thought",
       inputSchema: {
-        title: z.string().describe("Ukrainian title — short phrase"),
+        title: z.string().min(1).describe("Ukrainian title — short phrase"),
         thought: z.string().describe("The raw thought or observation"),
         context: z.string().optional().describe("What triggered this thought"),
         tags: z.array(z.string()).optional().describe("Tags beyond 'fleeting'"),
@@ -139,35 +139,44 @@ export function createServer(vaultRoot: string): McpServer {
       const { updateFrontmatterField } = await import("../vault/writer.js");
       const { parseFrontmatter, getBody } = await import("../vault/parser.js");
       const { join } = await import("node:path");
+      const { existsSync } = await import("node:fs");
       const fullPath = join(db.vaultRoot, args.note_path);
 
-      const fm = parseFrontmatter(fullPath);
-      const body = getBody(fullPath);
-
-      let key_ideas: string[] = [];
-      if (fm.type === "literature") {
-        const match = body.match(/##\s+Key Ideas[^\n]*\n([\s\S]*?)(?=\n##|$)/);
-        if (match) {
-          key_ideas = match[1].split("\n")
-            .map((l) => l.replace(/^\d+\.\s*/, "").trim())
-            .filter((l) => l.length > 0);
-        }
+      if (!existsSync(fullPath)) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Note not found: ${args.note_path}` }) }] };
       }
 
-      updateFrontmatterField(fullPath, "status", "processed");
-      db.indexNote(args.note_path);
+      try {
+        const fm = parseFrontmatter(fullPath);
+        const body = getBody(fullPath);
 
-      return {
-        content: [{
-          type: "text" as const,
-          text: JSON.stringify({
-            success: true,
-            path: args.note_path,
-            type: fm.type,
-            key_ideas: key_ideas.length > 0 ? key_ideas : undefined,
-          }, null, 2),
-        }],
-      };
+        let key_ideas: string[] = [];
+        if (fm.type === "literature") {
+          const match = body.match(/##\s+Key Ideas[^\n]*\n([\s\S]*?)(?=\n##|$)/);
+          if (match) {
+            key_ideas = match[1].split("\n")
+              .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+              .filter((l) => l.length > 0);
+          }
+        }
+
+        updateFrontmatterField(fullPath, "status", "processed");
+        db.indexNote(args.note_path);
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              success: true,
+              path: args.note_path,
+              type: fm.type,
+              key_ideas: key_ideas.length > 0 ? key_ideas : undefined,
+            }, null, 2),
+          }],
+        };
+      } catch (err: any) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Failed to promote: ${err.message}` }) }] };
+      }
     }
   );
 

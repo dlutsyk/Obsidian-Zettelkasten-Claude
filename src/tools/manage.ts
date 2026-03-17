@@ -94,7 +94,12 @@ export function zkFinalize(db: ZkDatabase, zkId: string) {
   const checks = {
     has_connections: links.length > 0,
     has_claim: !!fm.claim || /##\s+Claim[^\n]*\n\s*\S/.test(body),
-    has_evidence: /##\s+Evidence[^\n]*\n\s*-\s+\S/.test(body),
+    has_evidence: (() => {
+      const m = body.match(/##\s+Evidence[^\n]*\n([\s\S]*?)(?=\n##|$)/);
+      if (!m) return false;
+      // Check section has actual list content, not just a bare "-"
+      return /^-\s+\S/m.test(m[1]);
+    })(),
     has_confidence: !!fm.confidence,
   };
 

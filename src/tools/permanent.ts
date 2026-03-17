@@ -38,7 +38,10 @@ export function zkPermanent(db: ZkDatabase, args: PermanentArgs) {
 
   const evidence = (args.evidence ?? []).map((e) => `- ${e}`).join("\n");
   const counterpoints = (args.counterpoints ?? []).map((c) => `- ${c}`).join("\n");
-  const connLines = (args.connections ?? []).map((c) => `- **${c.type}:** [[${c.target}]]`).join("\n");
+  const connLines = (args.connections ?? []).map((c) => {
+    const t = c.target.replace(/^\[\[|\]\]$/g, "");
+    return `- **${c.type}:** [[${t}]]`;
+  }).join("\n");
 
   const body = `# ${args.title}
 

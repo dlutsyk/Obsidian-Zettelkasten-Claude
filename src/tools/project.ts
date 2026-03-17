@@ -24,7 +24,7 @@ export function zkProject(db: ZkDatabase, args: ProjectArgs) {
   if (args.deadline) fm.deadline = args.deadline;
 
   const tasks = (args.tasks ?? []).map((t) => `- [ ] ${t}`).join("\n") || "- [ ] ";
-  const related = (args.related_notes ?? []).map((n) => `- [[${n}]]`).join("\n") || "-";
+  const related = (args.related_notes ?? []).map((n) => `- [[${n.replace(/^\[\[|\]\]$/g, "")}]]`).join("\n") || "-";
 
   const body = `# ${args.title}
 

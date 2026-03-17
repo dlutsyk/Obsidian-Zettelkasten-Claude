@@ -37,7 +37,10 @@ export function zkLiterature(db: ZkDatabase, args: LiteratureArgs) {
   const keyIdeas = args.key_ideas.map((idea, i) => `${i + 1}. ${idea}`).join("\n");
   const quotes = (args.quotes ?? []).map((q) => `> "${q}"`).join("\n\n");
   const takeaways = (args.takeaways ?? []).map((t) => `- [ ] ${t}`).join("\n");
-  const connLines = (args.connections ?? []).map((c) => `- **${c.type}:** [[${c.target}]]`).join("\n");
+  const connLines = (args.connections ?? []).map((c) => {
+    const t = c.target.replace(/^\[\[|\]\]$/g, "");
+    return `- **${c.type}:** [[${t}]]`;
+  }).join("\n");
 
   const body = `# ${args.title}
 

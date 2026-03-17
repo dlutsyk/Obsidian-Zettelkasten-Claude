@@ -2,6 +2,7 @@ import { ZkDatabase } from "../db/index.js";
 import { createNote } from "../vault/writer.js";
 
 export function zkCapture(db: ZkDatabase, args: { title: string; thought: string; context?: string; tags?: string[] }) {
+  if (!args.title?.trim()) return { error: "Title must not be empty" };
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
   const time = now.toTimeString().slice(0, 5);
