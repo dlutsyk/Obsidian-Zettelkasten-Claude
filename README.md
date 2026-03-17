@@ -56,6 +56,7 @@ The MCP server starts automatically. Use prompts:
 | `/zk:moc`        | Create Map of Content — auto-pulls notes by tag        |
 | `/zk:project`    | Create project note with tasks and deadlines           |
 | `/zk:finalize`   | Quality-check and finalize permanent notes             |
+| `/zk:tree`       | Visualize the Luhmann knowledge tree                   |
 | `/zk:review`     | Vault health report                                    |
 | `/zk:daily`      | Morning briefing with age warnings                     |
 | `/zk:connect`    | Find and create connections for a note                 |
@@ -251,7 +252,7 @@ Source  → /zk:literature → Literature note
 
 1. `/zk:permanent` — write your claim as an atomic note
 2. `/zk:connect` — Claude scores candidates and suggests supporting/contradicting links
-3. Follow the Luhmann tree (1 → 1a → 1a1) to build a chain of reasoning
+3. `/zk:tree` — navigate the Luhmann tree (1 → 1a → 1a1) to build a chain of reasoning
 4. `/zk:finalize` — quality check: does the note have evidence, confidence level, enough connections?
 
 ### Daily knowledge work
@@ -292,7 +293,7 @@ Claude shows unprocessed notes grouped by urgency, suggests which to promote fir
 
 1. `/zk:project` — create a project note with tasks, deadlines, and linked permanent notes
 2. Link relevant permanent notes as the knowledge base for the project
-3. `/zk:review` — monitor project health alongside vault health
+3. `/zk:review` — track overall vault health and outstanding work
 
 ### Vault maintenance
 
@@ -304,7 +305,7 @@ Claude shows unprocessed notes grouped by urgency, suggests which to promote fir
 
 Claude reports: 12 unprocessed notes (3 urgent), 5 orphans, 2 emerging clusters without MOCs.
 
-1. `/zk:review` — full vault health report (orphans, unprocessed count, connection density)
+1. `/zk:review` — full vault health report (orphans, unprocessed count, link stats)
 2. `/zk:finalize` — batch quality-check draft permanent notes
 3. `/zk:moc` — create MOCs for emerging clusters detected by `/zk:reflect`
 
