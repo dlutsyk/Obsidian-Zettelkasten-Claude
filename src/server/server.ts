@@ -7,10 +7,13 @@ import { ZkDatabase } from "../db/index.js";
 import { zkCapture } from "../tools/capture.js";
 import { zkLiterature } from "../tools/literature.js";
 import { zkPermanent } from "../tools/permanent.js";
-import { zkFindById, zkListIds, zkEditNote, zkArchiveNote, zkDeleteNote } from "../tools/manage.js";
+import { zkFindById, zkListIds, zkEditNote, zkArchiveNote, zkDeleteNote, zkFinalize } from "../tools/manage.js";
 import { zkFindConnections, zkClusterDetect } from "../tools/search.js";
 import { zkUnprocessed, zkOrphans, zkReview } from "../tools/analysis.js";
 import { zkReindex, zkStatus } from "../tools/index-mgmt.js";
+import { zkMoc } from "../tools/moc.js";
+import { zkProject } from "../tools/project.js";
+import { zkBacklinks } from "../tools/backlinks.js";
 import { nextId } from "../luhmann.js";
 
 export function createServer(vaultRoot: string): McpServer {
@@ -20,7 +23,7 @@ export function createServer(vaultRoot: string): McpServer {
 
   const server = new McpServer({
     name: "obsidian-zk",
-    version: "0.1.0",
+    version: "0.2.0",
   });
 
   // === CORE CRUD TOOLS ===
@@ -84,6 +87,7 @@ export function createServer(vaultRoot: string): McpServer {
         tags: z.array(z.string()).optional(),
         connections: z.array(z.object({ target: z.string(), type: z.string() })).optional(),
         source_fleeting_path: z.string().optional().describe("Path of source fleeting note to mark as processed"),
+        source_literature_path: z.string().optional().describe("Path of source literature note to mark as processed"),
       },
     },
     async (args) => {
@@ -100,6 +104,7 @@ export function createServer(vaultRoot: string): McpServer {
         zk_id: z.string().describe("Luhmann ZK ID"),
         action: z.enum(["find", "edit", "archive", "delete"]),
         updates: z.record(z.string(), z.string()).optional().describe("Frontmatter fields to update (for edit action)"),
+        sections: z.record(z.string(), z.string()).optional().describe("Body sections to update (for edit action) — key is section header, value is new content"),
       },
     },
     async (args) => {
@@ -109,7 +114,7 @@ export function createServer(vaultRoot: string): McpServer {
           result = zkFindById(db, args.zk_id);
           break;
         case "edit":
-          result = zkEditNote(db, args.zk_id, (args.updates ?? {}) as Record<string, string>);
+          result = zkEditNote(db, args.zk_id, (args.updates ?? {}) as Record<string, string>, (args.sections as Record<string, string>) ?? undefined);
           break;
         case "archive":
           result = zkArchiveNote(db, args.zk_id);
@@ -125,18 +130,117 @@ export function createServer(vaultRoot: string): McpServer {
   server.registerTool(
     "zk_promote",
     {
-      description: "Mark a fleeting note as processed",
+      description: "Mark a fleeting or literature note as processed, returns key_ideas for literature notes",
       inputSchema: {
-        note_path: z.string().describe("Relative path to the fleeting note"),
+        note_path: z.string().describe("Relative path to the note"),
       },
     },
     async (args) => {
       const { updateFrontmatterField } = await import("../vault/writer.js");
+      const { parseFrontmatter, getBody } = await import("../vault/parser.js");
       const { join } = await import("node:path");
       const fullPath = join(db.vaultRoot, args.note_path);
+
+      const fm = parseFrontmatter(fullPath);
+      const body = getBody(fullPath);
+
+      let key_ideas: string[] = [];
+      if (fm.type === "literature") {
+        const match = body.match(/##\s+Key Ideas[^\n]*\n([\s\S]*?)(?=\n##|$)/);
+        if (match) {
+          key_ideas = match[1].split("\n")
+            .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+            .filter((l) => l.length > 0);
+        }
+      }
+
       updateFrontmatterField(fullPath, "status", "processed");
-      db.reindex();
-      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, path: args.note_path }) }] };
+      db.indexNote(args.note_path);
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({
+            success: true,
+            path: args.note_path,
+            type: fm.type,
+            key_ideas: key_ideas.length > 0 ? key_ideas : undefined,
+          }, null, 2),
+        }],
+      };
+    }
+  );
+
+  // === NEW: MOC TOOL ===
+
+  server.registerTool(
+    "zk_moc",
+    {
+      description: "Create a Map of Content note — auto-pulls notes by tag cluster",
+      inputSchema: {
+        topic: z.string().describe("MOC topic title in Ukrainian"),
+        tags: z.array(z.string()).optional().describe("Tags to auto-pull matching notes"),
+        note_paths: z.array(z.string()).optional().describe("Explicit note paths to include"),
+      },
+    },
+    async (args) => {
+      const result = zkMoc(db, args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // === NEW: PROJECT TOOL ===
+
+  server.registerTool(
+    "zk_project",
+    {
+      description: "Create a project note with objectives, tasks, and related notes",
+      inputSchema: {
+        title: z.string().describe("Project title in Ukrainian"),
+        objective: z.string().describe("Project objective/goal"),
+        tasks: z.array(z.string()).optional().describe("Task items"),
+        related_notes: z.array(z.string()).optional().describe("Titles of related notes (wikilinks)"),
+        priority: z.string().optional().describe("low|medium|high"),
+        deadline: z.string().optional().describe("Deadline date YYYY-MM-DD"),
+      },
+    },
+    async (args) => {
+      const result = zkProject(db, args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // === NEW: BACKLINKS TOOL ===
+
+  server.registerTool(
+    "zk_backlinks",
+    {
+      description: "Get incoming and outgoing links for a note",
+      inputSchema: {
+        note_path: z.string().optional().describe("Relative path to the note"),
+        note_title: z.string().optional().describe("Note title"),
+        zk_id: z.string().optional().describe("Luhmann ZK ID"),
+      },
+    },
+    async (args) => {
+      const result = zkBacklinks(db, args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // === NEW: FINALIZE TOOL ===
+
+  server.registerTool(
+    "zk_finalize",
+    {
+      description: "Quality-check a permanent note and finalize if all checks pass",
+      inputSchema: {
+        zk_id: z.string().describe("Luhmann ZK ID of the note to finalize"),
+      },
+    },
+    async (args) => {
+      const result = zkFinalize(db, args.zk_id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );
 
@@ -145,7 +249,7 @@ export function createServer(vaultRoot: string): McpServer {
   server.registerTool(
     "zk_find_connections",
     {
-      description: "Find connection candidates for a note by tags + links + keywords",
+      description: "Find connection candidates for a note by tags + keywords + Luhmann proximity + MOC overlap",
       inputSchema: {
         note_path: z.string().optional().describe("Relative path to the note"),
         note_title: z.string().optional().describe("Note title (alternative to path)"),
@@ -191,7 +295,7 @@ export function createServer(vaultRoot: string): McpServer {
   server.registerTool(
     "zk_unprocessed",
     {
-      description: "Find notes needing processing (unprocessed/draft status)",
+      description: "Find notes needing processing — includes age and urgency (>7d warning, >14d critical)",
       inputSchema: {
         type: z.string().optional().describe("Filter by type: fleeting, literature, permanent"),
       },

@@ -36,13 +36,14 @@ ${args.context || ""}
 - [ ] Архівувати або видалити
 `;
 
-  const filePath = createNote(db.vaultRoot, "1-Fleeting", args.title, fm, body);
-  db.reindex();
+  const relPath = `1-Fleeting/${args.title}.md`;
+  createNote(db.vaultRoot, "1-Fleeting", args.title, fm, body);
+  db.indexNote(relPath);
 
-  const connections = db.findConnections(`1-Fleeting/${args.title}.md`);
+  const connections = db.findConnections(relPath);
 
   return {
-    path: filePath,
+    path: relPath,
     title: args.title,
     connections: connections.slice(0, 5).map((c) => ({ title: c.title, score: c.score, reasons: c.reasons })),
   };

@@ -15,6 +15,7 @@ export interface PermanentArgs {
   tags?: string[];
   connections?: { target: string; type: string }[];
   source_fleeting_path?: string;
+  source_literature_path?: string;
 }
 
 export function zkPermanent(db: ZkDatabase, args: PermanentArgs) {
@@ -31,6 +32,7 @@ export function zkPermanent(db: ZkDatabase, args: PermanentArgs) {
     tags,
     status: "draft",
     confidence: args.confidence,
+    claim: args.claim,
     aliases: [],
   };
 
@@ -72,22 +74,33 @@ ${connLines || `- **Supports (Підтримує):**
 -
 `;
 
-  const filePath = createNote(db.vaultRoot, "3-Permanent", args.title, fm, body);
+  const relPath = `3-Permanent/${args.title}.md`;
+  createNote(db.vaultRoot, "3-Permanent", args.title, fm, body);
 
   // Mark source fleeting as processed
   if (args.source_fleeting_path) {
-    const fullPath = join(db.vaultRoot, args.source_fleeting_path);
     try {
-      updateFrontmatterField(fullPath, "status", "processed");
+      updateFrontmatterField(join(db.vaultRoot, args.source_fleeting_path), "status", "processed");
+      db.indexNote(args.source_fleeting_path);
     } catch {
       // Source may not exist
     }
   }
 
-  db.reindex();
+  // Mark source literature as processed
+  if (args.source_literature_path) {
+    try {
+      updateFrontmatterField(join(db.vaultRoot, args.source_literature_path), "status", "processed");
+      db.indexNote(args.source_literature_path);
+    } catch {
+      // Source may not exist
+    }
+  }
+
+  db.indexNote(relPath);
 
   return {
-    path: filePath,
+    path: relPath,
     title: args.title,
     zk_id: zkId,
     confidence: args.confidence,

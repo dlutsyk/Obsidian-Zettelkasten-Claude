@@ -65,6 +65,17 @@ export function moveNote(filePath: string, destFolder: string, vaultRoot: string
   return destPath;
 }
 
+export function updateSection(filePath: string, sectionHeader: string, newContent: string): void {
+  const text = readFileSync(filePath, "utf-8");
+  const escaped = sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(## ${escaped}[^\\n]*\\n)([\\s\\S]*?)(?=\\n## |$)`);
+  const match = text.match(re);
+  if (!match) return;
+  const before = text.slice(0, match.index! + match[1].length);
+  const after = text.slice(match.index! + match[0].length);
+  writeFileSync(filePath, before + "\n" + newContent + "\n" + after, "utf-8");
+}
+
 export function deleteNote(filePath: string): void {
   unlinkSync(filePath);
 }

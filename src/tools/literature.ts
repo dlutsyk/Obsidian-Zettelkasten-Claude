@@ -70,13 +70,14 @@ ${takeaways || "- [ ] "}
 ${connLines || "- "}
 `;
 
-  const filePath = createNote(db.vaultRoot, "2-Literature", args.title, fm, body);
-  db.reindex();
+  const relPath = `2-Literature/${args.title}.md`;
+  createNote(db.vaultRoot, "2-Literature", args.title, fm, body);
+  db.indexNote(relPath);
 
-  const candidates = db.findConnections(`2-Literature/${args.title}.md`);
+  const candidates = db.findConnections(relPath);
 
   return {
-    path: filePath,
+    path: relPath,
     title: args.title,
     permanentCandidates: args.key_ideas,
     connections: candidates.slice(0, 5).map((c) => ({ title: c.title, score: c.score, reasons: c.reasons })),

@@ -10,7 +10,6 @@ export function zkFindConnections(db: ZkDatabase, args: { note_path?: string; no
 
   if (!notePath) return { error: "Note not found", candidates: [] };
 
-  db.reindex();
   const candidates = db.findConnections(notePath);
 
   return {
@@ -26,7 +25,6 @@ export function zkFindConnections(db: ZkDatabase, args: { note_path?: string; no
 }
 
 export function zkClusterDetect(db: ZkDatabase) {
-  // Find groups of notes sharing tags but not yet connected via MOC
   const notes = db.db.prepare("SELECT * FROM notes WHERE type = 'permanent'").all() as any[];
   const tagGroups = new Map<string, string[]>();
 
@@ -38,7 +36,6 @@ export function zkClusterDetect(db: ZkDatabase) {
     }
   }
 
-  // Check if each cluster already has a MOC — suggests the topic is already organized
   const mocs = db.db.prepare("SELECT title FROM notes WHERE type = 'moc'").all() as { title: string }[];
   const mocTitles = new Set(mocs.map((m) => m.title.toLowerCase()));
 

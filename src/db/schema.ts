@@ -2,7 +2,7 @@
  * SQLite schema + migrations.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const CREATE_TABLES = `
 CREATE TABLE IF NOT EXISTS notes (
@@ -36,3 +36,8 @@ CREATE INDEX IF NOT EXISTS idx_notes_status ON notes(status);
 CREATE INDEX IF NOT EXISTS idx_notes_zk_id ON notes(zk_id);
 CREATE INDEX IF NOT EXISTS idx_links_target ON links(target);
 `;
+
+// Migration from v1 (title-based links) to v2 (path-based links)
+export const MIGRATIONS: Record<number, string[]> = {
+  2: ["DELETE FROM links"],
+};

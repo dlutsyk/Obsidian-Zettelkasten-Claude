@@ -5,9 +5,50 @@ import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
-import { CREATE_TABLES, SCHEMA_VERSION } from "./schema.js";
+import { CREATE_TABLES, SCHEMA_VERSION, MIGRATIONS } from "./schema.js";
 import { scanVault } from "../vault/scanner.js";
 import { parseFrontmatter, getBody, getTags, getWikilinks } from "../vault/parser.js";
+import type { Frontmatter } from "../vault/parser.js";
+
+function extractSummary(fm: Frontmatter, body: string, type: string | undefined): string {
+  if (type === "permanent" && fm.claim) {
+    return String(fm.claim);
+  }
+  if (type === "literature") {
+    const lines = body.split("\n");
+    let para = "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        if (para) return para.slice(0, 500);
+        continue;
+      }
+      para += (para ? " " : "") + trimmed;
+    }
+    if (para) return para.slice(0, 500);
+  }
+  if (type === "fleeting") {
+    const match = body.match(/##\s+Thought[^\n]*\n([\s\S]*?)(?=\n##|$)/);
+    if (match) return match[1].trim().slice(0, 500);
+  }
+  return body.trim().slice(0, 500);
+}
+
+function luhmannProximity(idA: string | null, idB: string | null): number {
+  if (!idA || !idB) return 0;
+  const partsA = idA.match(/(\d+|[a-z]+)/g) ?? [];
+  const partsB = idB.match(/(\d+|[a-z]+)/g) ?? [];
+  let common = 0;
+  for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
+    if (partsA[i] === partsB[i]) common++;
+    else break;
+  }
+  if (common === 0) return 0;
+  // Siblings: share all but last segment
+  if (common >= Math.max(partsA.length, partsB.length) - 1) return 3;
+  // Cousins: share at least one segment
+  return 1;
+}
 
 export class ZkDatabase {
   db: Database.Database;
@@ -19,10 +60,81 @@ export class ZkDatabase {
     if (!existsSync(dbDir)) mkdirSync(dbDir, { recursive: true });
     const dbPath = join(dbDir, "zettelkasten.db");
     this.db = new Database(dbPath);
-    // WAL mode: allows concurrent reads during writes, better for indexing while serving queries
     this.db.pragma("journal_mode = WAL");
     this.db.exec(CREATE_TABLES);
-    this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
+
+    // Schema migration
+    const row = this.db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string } | undefined;
+    const currentVersion = row ? parseInt(row.value, 10) : 1;
+
+    if (currentVersion < SCHEMA_VERSION) {
+      for (let v = currentVersion + 1; v <= SCHEMA_VERSION; v++) {
+        const stmts = MIGRATIONS[v];
+        if (stmts) {
+          for (const sql of stmts) this.db.exec(sql);
+        }
+      }
+      this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
+      // Force full reindex after migration to rebuild path-based links
+      this.reindex();
+    } else {
+      this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
+    }
+  }
+
+  resolveWikilink(title: string): string | null {
+    const row = this.db.prepare("SELECT path FROM notes WHERE title = ?").get(title) as { path: string } | undefined;
+    return row?.path ?? null;
+  }
+
+  indexNote(relPath: string): void {
+    const fullPath = join(this.vaultRoot, relPath);
+    let content: string;
+    try {
+      content = readFileSync(fullPath, "utf-8");
+    } catch {
+      return;
+    }
+
+    const hash = createHash("md5").update(content).digest("hex");
+    const fm = parseFrontmatter(fullPath);
+    const body = getBody(fullPath);
+    const title = basename(relPath, ".md");
+    const folder = dirname(relPath).split("/")[0] || "";
+    const tags = getTags(fm);
+    const type = fm.type as string | undefined;
+    const summary = extractSummary(fm, body, type);
+
+    this.db.prepare(`
+      INSERT OR REPLACE INTO notes (path, title, zk_id, type, status, folder, tags, summary, created, modified, content_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      relPath, title,
+      (fm.zk_id as string) || null,
+      type || null,
+      (fm.status as string) || null,
+      folder, JSON.stringify(tags), summary,
+      (fm.date as string) || null,
+      (fm.last_modified as string) || null,
+      hash
+    );
+
+    // Rebuild links for this note
+    this.db.prepare("DELETE FROM links WHERE source = ?").run(relPath);
+    const insertLink = this.db.prepare("INSERT OR REPLACE INTO links (source, target, link_type) VALUES (?, ?, ?)");
+    const wikilinks = getWikilinks(fullPath);
+    for (const target of wikilinks) {
+      const targetPath = this.resolveWikilink(target) ?? target;
+      insertLink.run(relPath, targetPath, null);
+    }
+
+    this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("last_index", new Date().toISOString());
+  }
+
+  removeNote(relPath: string): void {
+    this.db.prepare("DELETE FROM notes WHERE path = ?").run(relPath);
+    this.db.prepare("DELETE FROM links WHERE source = ?").run(relPath);
+    this.db.prepare("DELETE FROM links WHERE target = ?").run(relPath);
   }
 
   reindex(): { added: number; updated: number; removed: number } {
@@ -30,26 +142,25 @@ export class ZkDatabase {
     const currentPaths = new Set(notes.map((n) => n.relPath));
     let added = 0, updated = 0, removed = 0;
 
-    // Remove deleted notes
+    // Remove deleted notes + their links
     const dbPaths = this.db.prepare("SELECT path FROM notes").all() as { path: string }[];
-    const removePaths = dbPaths.filter((r) => !currentPaths.has(r.path));
     const deleteNote = this.db.prepare("DELETE FROM notes WHERE path = ?");
     const deleteLinks = this.db.prepare("DELETE FROM links WHERE source = ?");
-    for (const { path } of removePaths) {
+    for (const { path } of dbPaths.filter((r) => !currentPaths.has(r.path))) {
       deleteNote.run(path);
       deleteLinks.run(path);
       removed++;
     }
 
-    // Upsert notes
+    // Pass 1: upsert all notes
     const getHash = this.db.prepare("SELECT content_hash FROM notes WHERE path = ?");
     const upsert = this.db.prepare(`
       INSERT OR REPLACE INTO notes (path, title, zk_id, type, status, folder, tags, summary, created, modified, content_hash)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const insertLink = this.db.prepare("INSERT OR REPLACE INTO links (source, target, link_type) VALUES (?, ?, ?)");
+    const changedPaths = new Set<string>();
 
-    const transaction = this.db.transaction(() => {
+    const upsertTx = this.db.transaction(() => {
       for (const note of notes) {
         const fullPath = join(this.vaultRoot, note.relPath);
         let content: string;
@@ -59,45 +170,52 @@ export class ZkDatabase {
           continue;
         }
 
-        // Incremental indexing: skip files whose content hash hasn't changed
         const hash = createHash("md5").update(content).digest("hex");
         const existing = getHash.get(note.relPath) as { content_hash: string } | undefined;
         if (existing?.content_hash === hash) continue;
 
+        changedPaths.add(note.relPath);
         const fm = parseFrontmatter(fullPath);
         const body = getBody(fullPath);
         const title = basename(note.relPath, ".md");
         const folder = dirname(note.relPath).split("/")[0] || "";
         const tags = getTags(fm);
-        const summary = body.trim().slice(0, 200);
+        const type = fm.type as string | undefined;
+        const summary = extractSummary(fm, body, type);
 
         upsert.run(
-          note.relPath,
-          title,
+          note.relPath, title,
           (fm.zk_id as string) || null,
-          (fm.type as string) || null,
+          type || null,
           (fm.status as string) || null,
-          folder,
-          JSON.stringify(tags),
-          summary,
+          folder, JSON.stringify(tags), summary,
           (fm.date as string) || null,
           (fm.last_modified as string) || null,
           hash
         );
 
-        // Fully delete+reinsert links — simplest way to handle removed wikilinks
-        deleteLinks.run(note.relPath);
-        const wikilinks = getWikilinks(fullPath);
-        for (const target of wikilinks) {
-          insertLink.run(note.relPath, target, null);
-        }
-
         if (existing) updated++;
         else added++;
       }
     });
+    upsertTx();
 
-    transaction();
+    // Pass 2: rebuild links for changed notes (all notes now in DB for resolution)
+    const insertLink = this.db.prepare("INSERT OR REPLACE INTO links (source, target, link_type) VALUES (?, ?, ?)");
+    const deleteSrcLinks = this.db.prepare("DELETE FROM links WHERE source = ?");
+
+    const linkTx = this.db.transaction(() => {
+      for (const relPath of changedPaths) {
+        deleteSrcLinks.run(relPath);
+        const fullPath = join(this.vaultRoot, relPath);
+        const wikilinks = getWikilinks(fullPath);
+        for (const target of wikilinks) {
+          const targetPath = this.resolveWikilink(target) ?? target;
+          insertLink.run(relPath, targetPath, null);
+        }
+      }
+    });
+    linkTx();
 
     this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("last_index", new Date().toISOString());
     return { added, updated, removed };
@@ -149,10 +267,9 @@ export class ZkDatabase {
   }
 
   getOrphans(folder?: string) {
-    // LEFT JOIN + NULL: notes where no link row matched = no incoming links
     let sql = `
       SELECT n.* FROM notes n
-      LEFT JOIN links l ON l.target = n.title
+      LEFT JOIN links l ON l.target = n.path
       WHERE l.target IS NULL
     `;
     const params: string[] = [];
@@ -165,8 +282,18 @@ export class ZkDatabase {
     return this.db.prepare("SELECT * FROM links WHERE source = ?").all(relPath) as any[];
   }
 
-  getLinksTo(title: string) {
-    return this.db.prepare("SELECT * FROM links WHERE target = ?").all(title) as any[];
+  getLinksTo(path: string) {
+    return this.db.prepare("SELECT * FROM links WHERE target = ?").all(path) as any[];
+  }
+
+  shareMoc(pathA: string, pathB: string): boolean {
+    const row = this.db.prepare(`
+      SELECT COUNT(*) as c FROM links l1
+      JOIN links l2 ON l1.source = l2.source
+      JOIN notes n ON l1.source = n.path AND n.type = 'moc'
+      WHERE l1.target = ? AND l2.target = ?
+    `).get(pathA, pathB) as { c: number };
+    return row.c > 0;
   }
 
   findConnections(notePath: string) {
@@ -179,23 +306,39 @@ export class ZkDatabase {
     const candidates: { path: string; title: string; score: number; reasons: string[]; summary: string; type: string }[] = [];
 
     for (const other of allNotes) {
-      if (existingLinks.has(other.title)) continue;
+      if (existingLinks.has(other.path)) continue;
       let score = 0;
       const reasons: string[] = [];
 
-      // Scoring: shared tags worth 2pts each, keyword overlap 1pt each.
+      // Shared tags: 2pts each
       const otherTags = JSON.parse(other.tags || "[]") as string[];
       const shared = noteTags.filter((t) => otherTags.includes(t));
       score += shared.length * 2;
       reasons.push(...shared.map((t) => `tag:${t}`));
 
-      // 4-char minimum filters stopwords; Ukrainian+Latin regex covers both languages
+      // Keyword overlap: 6+ chars → +2, shorter → +1
       const noteWords = new Set((note.summary || "").toLowerCase().match(/[а-яієїґa-z]{4,}/g) ?? []);
       const otherWords = (other.summary || "").toLowerCase().match(/[а-яієїґa-z]{4,}/g) ?? [];
-      const kwMatches = otherWords.filter((w: string) => noteWords.has(w)).length;
-      score += kwMatches;
+      for (const w of otherWords) {
+        if (noteWords.has(w)) {
+          score += w.length >= 6 ? 2 : 1;
+          reasons.push(`kw:${w}`);
+        }
+      }
 
-      // Threshold ≥2 filters noise (single keyword match alone not enough)
+      // Luhmann proximity
+      const proximity = luhmannProximity(note.zk_id, other.zk_id);
+      if (proximity > 0) {
+        score += proximity;
+        reasons.push(proximity >= 3 ? "luhmann:sibling" : "luhmann:cousin");
+      }
+
+      // MOC boost: both notes referenced by same MOC
+      if (score >= 1 && this.shareMoc(notePath, other.path)) {
+        score += 2;
+        reasons.push("shared-moc");
+      }
+
       if (score >= 2) {
         candidates.push({ path: other.path, title: other.title, score, reasons, summary: other.summary || "", type: other.type || "" });
       }

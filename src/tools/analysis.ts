@@ -3,18 +3,36 @@ import { ZkDatabase } from "../db/index.js";
 export function zkUnprocessed(db: ZkDatabase, args: { type?: string }) {
   db.reindex();
   const notes = db.getUnprocessed(args.type);
+  const now = new Date();
 
   const grouped: Record<string, any[]> = {};
   for (const note of notes) {
     const folder = note.folder || "unknown";
     if (!grouped[folder]) grouped[folder] = [];
+
+    let age_days = 0;
+    if (note.created) {
+      const created = new Date(note.created);
+      age_days = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    let urgency: "normal" | "warning" | "critical" = "normal";
+    if (age_days > 14) urgency = "critical";
+    else if (age_days > 7) urgency = "warning";
+
     grouped[folder].push({
       title: note.title,
       path: note.path,
       status: note.status,
       date: note.created,
       type: note.type,
+      age_days,
+      urgency,
     });
+  }
+
+  for (const folder of Object.keys(grouped)) {
+    grouped[folder].sort((a: any, b: any) => b.age_days - a.age_days);
   }
 
   return grouped;
