@@ -4,7 +4,7 @@
 import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, dirname, basename, relative } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { CREATE_TABLES, SCHEMA_VERSION } from "./schema.js";
 import { scanVault } from "../vault/scanner.js";
 import { parseFrontmatter, getBody, getTags, getWikilinks } from "../vault/parser.js";
@@ -173,7 +173,6 @@ export class ZkDatabase {
     const note = this.getNoteByPath(notePath);
     if (!note) return [];
     const noteTags = JSON.parse(note.tags || "[]") as string[];
-    const noteTitle = note.title;
     const existingLinks = new Set(this.getLinksFrom(notePath).map((l: any) => l.target));
 
     const allNotes = this.db.prepare("SELECT * FROM notes WHERE path != ?").all(notePath) as any[];

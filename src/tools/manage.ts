@@ -1,6 +1,5 @@
 import { ZkDatabase } from "../db/index.js";
 import { updateFrontmatterField, moveNote, deleteNote } from "../vault/writer.js";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { compareLuhmannIds } from "../luhmann.js";
 

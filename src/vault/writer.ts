@@ -2,7 +2,7 @@
  * Note creation and editing — writes files to vault.
  */
 import { writeFileSync, readFileSync, mkdirSync, existsSync, renameSync, unlinkSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { Frontmatter } from "./parser.js";
 
 function serializeFrontmatter(fm: Frontmatter): string {
