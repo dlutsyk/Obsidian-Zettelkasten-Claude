@@ -28,7 +28,7 @@ const SECTION_HEADINGS: Record<string, Record<string, { heading: string; emptyVa
  * Extract content between a heading and the next same-or-higher-level heading (or EOF).
  * Returns trimmed content, or null if heading not found.
  */
-function sectionContent(body: string, heading: string): string | null {
+export function sectionContent(body: string, heading: string): string | null {
   const idx = body.indexOf(heading);
   if (idx === -1) return null;
   const afterHeading = body.slice(idx + heading.length);
@@ -42,7 +42,7 @@ function sectionContent(body: string, heading: string): string | null {
  * Compute boolean flags for a note based on its type.
  * Checks both frontmatter fields and section content.
  */
-function extractFlags(fm: Frontmatter, body: string, type: string | undefined): Record<string, boolean> {
+export function extractFlags(fm: Frontmatter, body: string, type: string | undefined): Record<string, boolean> {
   const flags: Record<string, boolean> = {};
   if (!type) return flags;
 
@@ -72,7 +72,7 @@ function extractFlags(fm: Frontmatter, body: string, type: string | undefined): 
   return flags;
 }
 
-function extractSummary(fm: Frontmatter, body: string, type: string | undefined): string {
+export function extractSummary(fm: Frontmatter, body: string, type: string | undefined): string {
   if (type === "permanent" && fm.claim) {
     return String(fm.claim);
   }
@@ -96,7 +96,7 @@ function extractSummary(fm: Frontmatter, body: string, type: string | undefined)
   return body.trim().slice(0, 500);
 }
 
-function luhmannProximity(idA: string | null, idB: string | null): number {
+export function luhmannProximity(idA: string | null, idB: string | null): number {
   if (!idA || !idB) return 0;
   // Direct parent↔child
   if (isParentChild(idA, idB)) return 7;

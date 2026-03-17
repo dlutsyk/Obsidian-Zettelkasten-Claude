@@ -132,7 +132,7 @@ Claude Code ←→ MCP Server (obsidian-zk serve) ←→ SQLite DB + Vault files
 CREATE TABLE notes (
   path TEXT PRIMARY KEY,
   title TEXT, zk_id TEXT, type TEXT, status TEXT,
-  folder TEXT, tags TEXT, summary TEXT,
+  folder TEXT, tags TEXT, summary TEXT, flags TEXT,
   created TEXT, modified TEXT, content_hash TEXT
 );
 
@@ -179,7 +179,7 @@ Notes are scored for connection relevance using multiple signals:
 
 - Shared tags: +2 per tag
 - Keyword overlap: +1 (4+ chars), +2 (6+ chars)
-- Luhmann proximity: +3 (siblings), +1 (cousins)
+- Luhmann proximity: +7 (parent/child), +5 (siblings), +2 (cousins)
 - Shared MOC: +2
 - Threshold: score ≥ 2 to appear as candidate
 
@@ -327,7 +327,11 @@ cd obsidian-zk
 npm install
 npm run build       # compile TypeScript
 npm run dev         # watch mode
+npm test            # run tests
+npm run test:coverage  # with coverage
 ```
+
+Pre-commit hook runs tests automatically via husky.
 
 Test locally:
 
@@ -372,7 +376,7 @@ src/
 │   └── index-mgmt.ts     # Reindex, status
 └── luhmann.ts            # ID generation + sorting
 templates/                # Copied to user vault on init
-├── claude/skills/        # 12 SKILL.md files
+├── claude/skills/        # 13 SKILL.md files
 ├── claude/agents/        # zk-analyzer agent
 ├── vault-folders/        # Default folder structure + note templates
 └── CLAUDE.md.template    # Project instructions
