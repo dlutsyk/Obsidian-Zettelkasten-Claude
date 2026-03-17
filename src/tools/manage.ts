@@ -1,6 +1,5 @@
 import { ZkDatabase } from "../db/index.js";
 import { updateFrontmatterField, updateSection, moveNote, deleteNote } from "../vault/writer.js";
-import { parseFrontmatter, getBody } from "../vault/parser.js";
 import { join } from "node:path";
 import { compareLuhmannIds } from "../luhmann.js";
 
@@ -86,26 +85,23 @@ export function zkFinalize(db: ZkDatabase, zkId: string) {
   const note = db.getNoteById(zkId);
   if (!note) return { error: `Note with ID ${zkId} not found` };
 
-  const fullPath = join(db.vaultRoot, note.path);
-  const fm = parseFrontmatter(fullPath);
-  const body = getBody(fullPath);
+  // Re-index to get fresh flags before checking
+  db.indexNote(note.path);
+  const fresh = db.getNoteById(zkId);
+  const flags = JSON.parse(fresh.flags || "{}") as Record<string, boolean>;
   const links = db.getLinksFrom(note.path);
 
   const checks = {
     has_connections: links.length > 0,
-    has_claim: !!fm.claim || /##\s+Claim[^\n]*\n\s*\S/.test(body),
-    has_evidence: (() => {
-      const m = body.match(/##\s+Evidence[^\n]*\n([\s\S]*?)(?=\n##|$)/);
-      if (!m) return false;
-      // Check section has actual list content, not just a bare "-"
-      return /^-\s+\S/m.test(m[1]);
-    })(),
-    has_confidence: !!fm.confidence,
+    has_claim: !!flags.has_claim,
+    has_evidence: !!flags.has_evidence,
+    has_confidence: !!flags.has_confidence,
   };
 
   const allPassed = Object.values(checks).every(Boolean);
 
   if (allPassed) {
+    const fullPath = join(db.vaultRoot, note.path);
     updateFrontmatterField(fullPath, "status", "finalized");
     updateFrontmatterField(fullPath, "last_modified", new Date().toISOString().slice(0, 10));
     db.indexNote(note.path);

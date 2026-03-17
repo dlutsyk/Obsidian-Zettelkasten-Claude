@@ -2,7 +2,7 @@
  * SQLite schema + migrations.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const CREATE_TABLES = `
 CREATE TABLE IF NOT EXISTS notes (
@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS notes (
   summary TEXT,
   created TEXT,
   modified TEXT,
-  content_hash TEXT
+  content_hash TEXT,
+  flags TEXT
 );
 
 CREATE TABLE IF NOT EXISTS links (

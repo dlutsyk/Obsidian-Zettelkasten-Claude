@@ -10,6 +10,67 @@ import { scanVault } from "../vault/scanner.js";
 import { parseFrontmatter, getBody, getTags, getWikilinks } from "../vault/parser.js";
 import type { Frontmatter } from "../vault/parser.js";
 
+/** Heading texts per note type — source of truth for section detection. */
+const SECTION_HEADINGS: Record<string, Record<string, { heading: string; emptyValues?: string[] }>> = {
+  permanent: {
+    has_claim:         { heading: "## Claim (Твердження)" },
+    has_elaboration:   { heading: "## Elaboration (Розкриття)" },
+    has_evidence:      { heading: "## Evidence & Support (Докази та підтримка)", emptyValues: ["-"] },
+    has_counterpoints: { heading: "## Counterpoints & Limitations (Контраргументи та обмеження)", emptyValues: ["-"] },
+  },
+  fleeting: {
+    has_thought: { heading: "## Thought (Думка)" },
+  },
+};
+
+/**
+ * Extract content between a heading and the next same-or-higher-level heading (or EOF).
+ * Returns trimmed content, or null if heading not found.
+ */
+function sectionContent(body: string, heading: string): string | null {
+  const idx = body.indexOf(heading);
+  if (idx === -1) return null;
+  const afterHeading = body.slice(idx + heading.length);
+  // Match next ## heading (or end)
+  const nextIdx = afterHeading.search(/\n##\s/);
+  const raw = nextIdx === -1 ? afterHeading : afterHeading.slice(0, nextIdx);
+  return raw.trim();
+}
+
+/**
+ * Compute boolean flags for a note based on its type.
+ * Checks both frontmatter fields and section content.
+ */
+function extractFlags(fm: Frontmatter, body: string, type: string | undefined): Record<string, boolean> {
+  const flags: Record<string, boolean> = {};
+  if (!type) return flags;
+
+  // Frontmatter-derived flags (applicable to any type)
+  if (fm.confidence) flags.has_confidence = true;
+  if (fm.claim) flags.has_claim = true;
+
+  // Section-derived flags
+  const defs = SECTION_HEADINGS[type];
+  if (!defs) return flags;
+
+  for (const [flag, { heading, emptyValues }] of Object.entries(defs)) {
+    if (flags[flag]) continue; // already true from frontmatter
+    const content = sectionContent(body, heading);
+    if (content === null || content.length === 0) {
+      flags[flag] = false;
+      continue;
+    }
+    // Check against known empty placeholders
+    if (emptyValues?.includes(content)) {
+      flags[flag] = false;
+      continue;
+    }
+    flags[flag] = true;
+  }
+
+  return flags;
+}
+
 function extractSummary(fm: Frontmatter, body: string, type: string | undefined): string {
   if (type === "permanent" && fm.claim) {
     return String(fm.claim);
@@ -63,6 +124,12 @@ export class ZkDatabase {
     this.db.pragma("journal_mode = WAL");
     this.db.exec(CREATE_TABLES);
 
+    // Migrate: add flags column if missing (v1 → v2)
+    const cols = this.db.pragma("table_info(notes)") as { name: string }[];
+    if (!cols.some((c) => c.name === "flags")) {
+      this.db.exec("ALTER TABLE notes ADD COLUMN flags TEXT");
+    }
+
     this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("schema_version", String(SCHEMA_VERSION));
   }
 
@@ -88,10 +155,11 @@ export class ZkDatabase {
     const tags = getTags(fm);
     const type = fm.type as string | undefined;
     const summary = extractSummary(fm, body, type);
+    const flags = extractFlags(fm, body, type);
 
     this.db.prepare(`
-      INSERT OR REPLACE INTO notes (path, title, zk_id, type, status, folder, tags, summary, created, modified, content_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO notes (path, title, zk_id, type, status, folder, tags, summary, created, modified, content_hash, flags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       relPath, title,
       (fm.zk_id as string) || null,
@@ -100,7 +168,8 @@ export class ZkDatabase {
       folder, JSON.stringify(tags), summary,
       (fm.date as string) || null,
       (fm.last_modified as string) || null,
-      hash
+      hash,
+      JSON.stringify(flags)
     );
 
     // Rebuild links for this note
@@ -139,8 +208,8 @@ export class ZkDatabase {
     // Pass 1: upsert all notes
     const getHash = this.db.prepare("SELECT content_hash FROM notes WHERE path = ?");
     const upsert = this.db.prepare(`
-      INSERT OR REPLACE INTO notes (path, title, zk_id, type, status, folder, tags, summary, created, modified, content_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO notes (path, title, zk_id, type, status, folder, tags, summary, created, modified, content_hash, flags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const changedPaths = new Set<string>();
 
@@ -166,6 +235,7 @@ export class ZkDatabase {
         const tags = getTags(fm);
         const type = fm.type as string | undefined;
         const summary = extractSummary(fm, body, type);
+        const flags = extractFlags(fm, body, type);
 
         upsert.run(
           note.relPath, title,
@@ -175,7 +245,8 @@ export class ZkDatabase {
           folder, JSON.stringify(tags), summary,
           (fm.date as string) || null,
           (fm.last_modified as string) || null,
-          hash
+          hash,
+          JSON.stringify(flags)
         );
 
         if (existing) updated++;
