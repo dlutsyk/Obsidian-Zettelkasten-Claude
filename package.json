@@ -1,6 +1,6 @@
 {
   "name": "obsidian-zk",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Obsidian Zettelkasten MCP server with Luhmann numbering",
   "type": "module",
   "bin": {
