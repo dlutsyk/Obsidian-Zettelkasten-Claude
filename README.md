@@ -197,6 +197,127 @@ Source  → /zk:literature → Literature note
          MOC (when 3+ related notes cluster)
 ```
 
+## Use cases
+
+### Research & learning
+
+**Reading a book or paper:**
+
+```
+> /zk:literature
+> Here are my highlights from "Thinking, Fast and Slow" by Kahneman...
+```
+
+1. `/zk:literature` — paste highlights, Claude creates a structured literature note with source metadata
+2. `/zk:promote` — extract atomic ideas into permanent notes, each with its own Luhmann ID
+3. `/zk:connect` — Claude finds related notes in your vault and suggests typed connections
+
+**Exploring a new topic:**
+
+```
+> /zk:capture
+> Just learned that mitochondrial DNA is inherited only from the mother.
+> This might connect to my notes on epigenetics.
+```
+
+1. `/zk:capture` several fleeting notes as you read/watch/listen
+2. `/zk:daily` — review what's accumulated, see age warnings for stale notes
+3. `/zk:promote` in batch — convert the best ideas into permanent notes
+4. `/zk:moc` — once 3+ notes cluster around a theme, create a Map of Content
+
+### Writing & thinking
+
+**Preparing an article or essay:**
+
+```
+> /zk:reflect
+> I'm writing a blog post about decision-making under uncertainty.
+> What themes in my vault are relevant?
+```
+
+1. `/zk:reflect` — Claude analyzes vault themes and surfaces unexpected connections
+2. `/zk:review` — find orphaned notes and weak spots in your knowledge graph
+3. Browse MOCs to build an outline from existing permanent notes
+4. `/zk:connect` — strengthen the argument by finding supporting/contradicting notes
+
+**Developing an argument:**
+
+```
+> /zk:permanent
+> Claim: distributed teams outperform co-located ones when
+> async communication norms are explicit.
+```
+
+1. `/zk:permanent` — write your claim as an atomic note
+2. `/zk:connect` — Claude scores candidates and suggests supporting/contradicting links
+3. Follow the Luhmann tree (1 → 1a → 1a1) to build a chain of reasoning
+4. `/zk:finalize` — quality check: does the note have evidence, confidence level, enough connections?
+
+### Daily knowledge work
+
+**Morning routine:**
+
+```
+> /zk:daily
+```
+
+Claude shows unprocessed notes grouped by urgency, suggests which to promote first.
+
+1. `/zk:daily` — see unprocessed notes with urgency tiers, aging warnings
+2. `/zk:promote` — process the oldest fleeting notes first
+3. `/zk:connect` on newly promoted notes — integrate them into the graph
+
+**After a meeting or conversation:**
+
+```
+> /zk:capture
+> Meeting with Alex: they suggested using event sourcing instead of CRUD
+> for the audit log. Interesting tradeoff — immutability vs query complexity.
+```
+
+1. `/zk:capture` — dump raw thoughts quickly (title + body, no structure needed)
+2. Come back later, `/zk:promote` — Claude helps extract the key insight into a permanent note
+
+### Project management
+
+**Tracking a goal:**
+
+```
+> /zk:project
+> Project: "Q2 API redesign". Deadline: June 30.
+> Key tasks: schema migration, client SDK update, docs rewrite.
+> Link to my notes on REST vs GraphQL tradeoffs.
+```
+
+1. `/zk:project` — create a project note with tasks, deadlines, and linked permanent notes
+2. Link relevant permanent notes as the knowledge base for the project
+3. `/zk:review` — monitor project health alongside vault health
+
+### Vault maintenance
+
+**Weekly cleanup:**
+
+```
+> /zk:review
+```
+
+Claude reports: 12 unprocessed notes (3 urgent), 5 orphans, 2 emerging clusters without MOCs.
+
+1. `/zk:review` — full vault health report (orphans, unprocessed count, connection density)
+2. `/zk:finalize` — batch quality-check draft permanent notes
+3. `/zk:moc` — create MOCs for emerging clusters detected by `/zk:reflect`
+
+**Onboarding to an existing vault:**
+
+```
+> /zk:reflect
+> I just inherited this vault. What are the main themes and how do they connect?
+```
+
+1. `/zk:review` — get a high-level picture of vault state
+2. `/zk:reflect` — understand major themes and how they connect
+3. Browse MOCs and Luhmann trees to navigate the knowledge structure
+
 ## Development
 
 ```bash
