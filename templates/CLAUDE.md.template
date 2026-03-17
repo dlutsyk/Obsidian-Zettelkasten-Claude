@@ -20,7 +20,11 @@ The vault uses the `ozc` MCP server for all Zettelkasten operations. Tools are a
 | `zk_literature` | Create literature note from source |
 | `zk_permanent` | Create permanent note with Luhmann ID |
 | `zk_manage` | Edit/archive/delete by ID |
-| `zk_promote` | Mark fleeting as processed |
+| `zk_promote` | Mark fleeting/literature as processed |
+| `zk_finalize` | Quality-check permanent note, finalize if all checks pass |
+| `zk_moc` | Create Map of Content — auto-pulls notes by tag cluster |
+| `zk_project` | Create project note with objectives and tasks |
+| `zk_backlinks` | Get incoming/outgoing links for a note |
 | `zk_find_connections` | Find connection candidates |
 | `zk_cluster_detect` | Find emerging themes |
 | `zk_list` | List/filter notes |
@@ -33,9 +37,9 @@ The vault uses the `ozc` MCP server for all Zettelkasten operations. Tools are a
 | `zk_reindex` | Re-scan vault |
 | `zk_status` | DB stats |
 
-### Available Prompts (Slash Commands)
+### Available Skills (Slash Commands)
 
-`/zk:capture`, `/zk:literature`, `/zk:permanent`, `/zk:promote`, `/zk:manage`, `/zk:review`, `/zk:daily`, `/zk:connect`, `/zk:reflect`
+`/zk:capture`, `/zk:literature`, `/zk:permanent`, `/zk:promote`, `/zk:manage`, `/zk:finalize`, `/zk:moc`, `/zk:project`, `/zk:review`, `/zk:daily`, `/zk:connect`, `/zk:reflect`
 
 ## Note folders & lifecycle
 
