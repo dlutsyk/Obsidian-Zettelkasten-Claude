@@ -8,6 +8,7 @@ import { join, dirname, basename } from "node:path";
 import { CREATE_TABLES, SCHEMA_VERSION } from "./schema.js";
 import { scanVault } from "../vault/scanner.js";
 import { parseFrontmatter, getBody, getTags, getWikilinks } from "../vault/parser.js";
+import { isParentChild } from "../luhmann.js";
 import type { Frontmatter } from "../vault/parser.js";
 
 /** Heading texts per note type — source of truth for section detection. */
@@ -97,6 +98,8 @@ function extractSummary(fm: Frontmatter, body: string, type: string | undefined)
 
 function luhmannProximity(idA: string | null, idB: string | null): number {
   if (!idA || !idB) return 0;
+  // Direct parent↔child
+  if (isParentChild(idA, idB)) return 7;
   const partsA = idA.match(/(\d+|[a-z]+)/g) ?? [];
   const partsB = idB.match(/(\d+|[a-z]+)/g) ?? [];
   let common = 0;
@@ -106,9 +109,9 @@ function luhmannProximity(idA: string | null, idB: string | null): number {
   }
   if (common === 0) return 0;
   // Siblings: share all but last segment
-  if (common >= Math.max(partsA.length, partsB.length) - 1) return 3;
+  if (common >= Math.max(partsA.length, partsB.length) - 1) return 5;
   // Cousins: share at least one segment
-  return 1;
+  return 2;
 }
 
 export class ZkDatabase {
@@ -385,7 +388,7 @@ export class ZkDatabase {
       const proximity = luhmannProximity(note.zk_id, other.zk_id);
       if (proximity > 0) {
         score += proximity;
-        reasons.push(proximity >= 3 ? "luhmann:sibling" : "luhmann:cousin");
+        reasons.push(proximity >= 7 ? "luhmann:parent-child" : proximity >= 5 ? "luhmann:sibling" : "luhmann:cousin");
       }
 
       // MOC boost: both notes referenced by same MOC

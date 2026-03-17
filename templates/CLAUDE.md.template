@@ -32,7 +32,7 @@ The vault uses the `ozc` MCP server for all Zettelkasten operations. Tools are a
 | `zk_orphans` | Find orphan notes |
 | `zk_next_id` | Next Luhmann ID |
 | `zk_find_by_id` | Resolve ID to path |
-| `zk_list_ids` | All numbered notes |
+| `zk_tree` | Visualize Luhmann tree (full / subtree / context) |
 | `zk_review` | Full vault health report |
 | `zk_reindex` | Re-scan vault |
 | `zk_status` | DB stats |

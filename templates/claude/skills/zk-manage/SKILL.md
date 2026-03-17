@@ -9,8 +9,8 @@ Manage permanent notes by Luhmann ZK ID.
 
 ## Operations
 
-### List all numbered notes
-Use `zk_list_ids` MCP tool.
+### View knowledge tree
+Use `zk_tree` MCP tool. No args = full tree. `root_id` = subtree. `context_id` = ancestors/siblings/children around a note.
 
 ### Edit note by ID
 Use `zk_manage` MCP tool with action=find, then action=edit.

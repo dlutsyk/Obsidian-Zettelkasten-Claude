@@ -1,7 +1,7 @@
 import { ZkDatabase } from "../db/index.js";
 import { updateFrontmatterField, updateSection, moveNote, deleteNote } from "../vault/writer.js";
 import { join } from "node:path";
-import { compareLuhmannIds } from "../luhmann.js";
+import { compareLuhmannIds, buildTree, renderTree, getContext, getParentId } from "../luhmann.js";
 
 export function zkFindById(db: ZkDatabase, zkId: string) {
   const note = db.getNoteById(zkId);
@@ -9,19 +9,57 @@ export function zkFindById(db: ZkDatabase, zkId: string) {
   return { found: true, path: note.path, title: note.title };
 }
 
-export function zkListIds(db: ZkDatabase) {
+export function zkTree(db: ZkDatabase, opts: { root_id?: string; context_id?: string; depth?: number }) {
   const rows = db.db.prepare(
     "SELECT zk_id, title, status, path FROM notes WHERE zk_id IS NOT NULL AND zk_id != '' ORDER BY zk_id"
   ).all() as { zk_id: string; title: string; status: string; path: string }[];
-
   rows.sort((a, b) => compareLuhmannIds(a.zk_id, b.zk_id));
 
-  return rows.map((r) => ({
-    zk_id: r.zk_id,
-    title: r.title,
-    status: r.status,
-    path: r.path,
-  }));
+  const depth = opts.depth ?? 5;
+  const hints = `\n→ zk_find_by_id { id: "X" } to read a note\n→ zk_tree { context_id: "X" } to explore around a note`;
+
+  if (opts.context_id) {
+    const ctx = getContext(rows, opts.context_id);
+    const self = rows.find((r) => r.zk_id === opts.context_id);
+    let out = `Context for [${opts.context_id}]`;
+    if (self) out += ` ${self.title}`;
+    out += "\n\n";
+    if (ctx.ancestors.length) {
+      out += "Ancestors:\n" + ctx.ancestors.map((a) => `  [${a.zk_id}] ${a.title}`).join("\n") + "\n\n";
+    }
+    if (ctx.siblings.length) {
+      out += "Siblings:\n" + ctx.siblings.map((s) => `  [${s.zk_id}] ${s.title}`).join("\n") + "\n\n";
+    }
+    if (ctx.children.length) {
+      // Include all descendants, not just direct children
+      const descendants = rows.filter((r) => {
+        let cur: string | null = r.zk_id;
+        while ((cur = getParentId(cur)) !== null) {
+          if (cur === opts.context_id) return true;
+        }
+        return false;
+      });
+      const childTree = buildTree(descendants);
+      out += "Children:\n" + renderTree(childTree, depth) + "\n";
+    }
+    return out + hints;
+  }
+
+  let source = rows;
+  if (opts.root_id) {
+    source = rows.filter((r) => {
+      let cur: string | null = r.zk_id;
+      while (cur) {
+        if (cur === opts.root_id) return true;
+        cur = getParentId(cur);
+      }
+      return false;
+    });
+  }
+
+  const tree = buildTree(source);
+  const ascii = renderTree(tree, depth);
+  return (ascii || "(empty tree)") + hints;
 }
 
 export function zkEditNote(db: ZkDatabase, zkId: string, updates: Record<string, string>, sections?: Record<string, string>) {

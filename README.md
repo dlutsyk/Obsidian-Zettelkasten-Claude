@@ -46,20 +46,20 @@ claude
 The MCP server starts automatically. Use prompts:
 
 
-| Command          | What it does                                         |
-| ---------------- | ---------------------------------------------------- |
-| `/zk:capture`    | Quick fleeting note from a thought                   |
-| `/zk:literature` | Literature note from pasted source                   |
-| `/zk:permanent`  | Atomic permanent note with auto Luhmann ID           |
+| Command          | What it does                                           |
+| ---------------- | ------------------------------------------------------ |
+| `/zk:capture`    | Quick fleeting note from a thought                     |
+| `/zk:literature` | Literature note from pasted source                     |
+| `/zk:permanent`  | Atomic permanent note with auto Luhmann ID             |
 | `/zk:promote`    | Convert fleeting/literature → permanent (single/batch) |
-| `/zk:manage`     | Edit/archive/delete by Luhmann number                |
-| `/zk:moc`        | Create Map of Content — auto-pulls notes by tag      |
-| `/zk:project`    | Create project note with tasks and deadlines         |
-| `/zk:finalize`   | Quality-check and finalize permanent notes           |
-| `/zk:review`     | Vault health report                                  |
-| `/zk:daily`      | Morning briefing with age warnings                   |
-| `/zk:connect`    | Find and create connections for a note               |
-| `/zk:reflect`    | Deep reflection on vault themes                      |
+| `/zk:manage`     | Edit/archive/delete by Luhmann number                  |
+| `/zk:moc`        | Create Map of Content — auto-pulls notes by tag        |
+| `/zk:project`    | Create project note with tasks and deadlines           |
+| `/zk:finalize`   | Quality-check and finalize permanent notes             |
+| `/zk:review`     | Vault health report                                    |
+| `/zk:daily`      | Morning briefing with age warnings                     |
+| `/zk:connect`    | Find and create connections for a note                 |
+| `/zk:reflect`    | Deep reflection on vault themes                        |
 
 
 ### 3. Update
@@ -118,7 +118,7 @@ Claude Code ←→ MCP Server (obsidian-zk serve) ←→ SQLite DB + Vault files
 - `zk_finalize` — quality-check permanent notes (connections, claim, evidence, confidence)
 - `zk_next_id` — next Luhmann ID
 - `zk_find_by_id` — resolve ID → path
-- `zk_list_ids` — all numbered notes
+- `zk_tree` — visualize Luhmann tree (full, subtree, or context around a note)
 - `zk_review` — full vault health report
 
 **Index:**
@@ -176,6 +176,7 @@ Links use **path-based resolution** — wikilink titles resolved to file paths d
 ### Connection scoring
 
 Notes are scored for connection relevance using multiple signals:
+
 - Shared tags: +2 per tag
 - Keyword overlap: +1 (4+ chars), +2 (6+ chars)
 - Luhmann proximity: +3 (siblings), +1 (cousins)

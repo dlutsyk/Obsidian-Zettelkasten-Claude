@@ -7,7 +7,7 @@ import { ZkDatabase } from "../db/index.js";
 import { zkCapture } from "../tools/capture.js";
 import { zkLiterature } from "../tools/literature.js";
 import { zkPermanent } from "../tools/permanent.js";
-import { zkFindById, zkListIds, zkEditNote, zkArchiveNote, zkDeleteNote, zkFinalize } from "../tools/manage.js";
+import { zkFindById, zkTree, zkEditNote, zkArchiveNote, zkDeleteNote, zkFinalize } from "../tools/manage.js";
 import { zkFindConnections, zkClusterDetect } from "../tools/search.js";
 import { zkUnprocessed, zkOrphans, zkReview } from "../tools/analysis.js";
 import { zkReindex, zkStatus } from "../tools/index-mgmt.js";
@@ -360,15 +360,19 @@ export function createServer(vaultRoot: string): McpServer {
   );
 
   server.registerTool(
-    "zk_list_ids",
+    "zk_tree",
     {
-      description: "List all numbered permanent notes with Luhmann IDs",
-      inputSchema: {},
+      description: "Visualize the Luhmann knowledge tree — full tree, subtree from root_id, or context around context_id",
+      inputSchema: {
+        root_id: z.string().optional().describe("Show subtree from this ID"),
+        context_id: z.string().optional().describe("Show ancestors, siblings, children of this note"),
+        depth: z.number().optional().describe("Max depth (default 5)"),
+      },
     },
-    async () => {
+    async (args) => {
       db.reindex();
-      const result = zkListIds(db);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      const result = zkTree(db, args);
+      return { content: [{ type: "text" as const, text: result }] };
     }
   );
 
