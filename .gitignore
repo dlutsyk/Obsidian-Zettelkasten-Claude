@@ -27,3 +27,6 @@ Attachments/
 # Claude memory
 .claude/
 
+# Agents
+.agents/
+skills-lock.json
