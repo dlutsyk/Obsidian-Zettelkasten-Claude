@@ -3,12 +3,13 @@
  */
 import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
-import { readFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { CREATE_TABLES, SCHEMA_VERSION } from "./schema.js";
 import { scanVault } from "../vault/scanner.js";
 import { parseFrontmatter, getBody, getTags, getWikilinks } from "../vault/parser.js";
 import { isParentChild } from "../luhmann.js";
+import { CONFIG } from "../config.js";
 import type { Frontmatter } from "../vault/parser.js";
 
 /** Heading texts per note type — source of truth for section detection. */
@@ -82,18 +83,18 @@ export function extractSummary(fm: Frontmatter, body: string, type: string | und
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#")) {
-        if (para) return para.slice(0, 500);
+        if (para) return para.slice(0, CONFIG.MAX_SUMMARY_LENGTH);
         continue;
       }
       para += (para ? " " : "") + trimmed;
     }
-    if (para) return para.slice(0, 500);
+    if (para) return para.slice(0, CONFIG.MAX_SUMMARY_LENGTH);
   }
   if (type === "fleeting") {
     const match = body.match(/##\s+Thought[^\n]*\n([\s\S]*?)(?=\n##|$)/);
-    if (match) return match[1].trim().slice(0, 500);
+    if (match) return match[1].trim().slice(0, CONFIG.MAX_SUMMARY_LENGTH);
   }
-  return body.trim().slice(0, 500);
+  return body.trim().slice(0, CONFIG.MAX_SUMMARY_LENGTH);
 }
 
 export function luhmannProximity(idA: string | null, idB: string | null): number {
@@ -175,13 +176,13 @@ export class ZkDatabase {
       JSON.stringify(flags)
     );
 
-    // Rebuild links for this note
+    // Rebuild links for this note — only insert if target resolves to a known note
     this.db.prepare("DELETE FROM links WHERE source = ?").run(relPath);
     const insertLink = this.db.prepare("INSERT OR REPLACE INTO links (source, target, link_type) VALUES (?, ?, ?)");
     const wikilinks = getWikilinks(fullPath);
     for (const target of wikilinks) {
-      const targetPath = this.resolveWikilink(target) ?? target;
-      insertLink.run(relPath, targetPath, null);
+      const targetPath = this.resolveWikilink(target);
+      if (targetPath) insertLink.run(relPath, targetPath, null);
     }
 
     this.db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)").run("last_index", new Date().toISOString());
@@ -268,8 +269,8 @@ export class ZkDatabase {
         const fullPath = join(this.vaultRoot, relPath);
         const wikilinks = getWikilinks(fullPath);
         for (const target of wikilinks) {
-          const targetPath = this.resolveWikilink(target) ?? target;
-          insertLink.run(relPath, targetPath, null);
+          const targetPath = this.resolveWikilink(target);
+          if (targetPath) insertLink.run(relPath, targetPath, null);
         }
       }
     });
@@ -368,18 +369,19 @@ export class ZkDatabase {
       let score = 0;
       const reasons: string[] = [];
 
-      // Shared tags: 2pts each
+      // Shared tags
       const otherTags = JSON.parse(other.tags || "[]") as string[];
       const shared = noteTags.filter((t) => otherTags.includes(t));
-      score += shared.length * 2;
+      score += shared.length * CONFIG.TAG_SCORE;
       reasons.push(...shared.map((t) => `tag:${t}`));
 
-      // Keyword overlap: 6+ chars → +2, shorter → +1
-      const noteWords = new Set((note.summary || "").toLowerCase().match(/[а-яієїґa-z]{4,}/g) ?? []);
-      const otherWords = (other.summary || "").toLowerCase().match(/[а-яієїґa-z]{4,}/g) ?? [];
+      // Keyword overlap
+      const kwRegex = new RegExp(`[а-яієїґa-z]{${CONFIG.KEYWORD_MIN_LENGTH},}`, "g");
+      const noteWords = new Set((note.summary || "").toLowerCase().match(kwRegex) ?? []);
+      const otherWords = (other.summary || "").toLowerCase().match(kwRegex) ?? [];
       for (const w of otherWords) {
         if (noteWords.has(w)) {
-          score += w.length >= 6 ? 2 : 1;
+          score += w.length >= CONFIG.KEYWORD_LONG_LENGTH ? 2 : 1;
           reasons.push(`kw:${w}`);
         }
       }
@@ -393,16 +395,42 @@ export class ZkDatabase {
 
       // MOC boost: both notes referenced by same MOC
       if (score >= 1 && this.shareMoc(notePath, other.path)) {
-        score += 2;
+        score += CONFIG.MOC_BONUS;
         reasons.push("shared-moc");
       }
 
-      if (score >= 2) {
+      if (score >= CONFIG.MIN_CONNECTION_SCORE) {
         candidates.push({ path: other.path, title: other.title, score, reasons, summary: other.summary || "", type: other.type || "" });
       }
     }
 
-    return candidates.sort((a, b) => b.score - a.score).slice(0, 15);
+    return candidates.sort((a, b) => b.score - a.score).slice(0, CONFIG.MAX_CONNECTIONS);
+  }
+
+  /**
+   * Check if vault has changed since last reindex by comparing file mtimes.
+   * Returns true if reindex is needed.
+   */
+  needsReindex(): boolean {
+    const lastIndexRow = this.db.prepare("SELECT value FROM meta WHERE key = 'last_index'").get() as { value: string } | undefined;
+    if (!lastIndexRow) return true;
+    const lastIndexMs = new Date(lastIndexRow.value).getTime();
+    const notes = scanVault(this.vaultRoot);
+    for (const note of notes) {
+      try {
+        const mtime = statSync(note.path).mtimeMs;
+        if (mtime > lastIndexMs) return true;
+      } catch { continue; }
+    }
+    // Check for deleted notes
+    const dbCount = (this.db.prepare("SELECT COUNT(*) as c FROM notes").get() as any).c;
+    if (dbCount !== notes.length) return true;
+    return false;
+  }
+
+  /** Reindex only if vault changed since last index. */
+  ensureFresh(): void {
+    if (this.needsReindex()) this.reindex();
   }
 
   getStats() {

@@ -69,12 +69,24 @@ describe("indexNote", () => {
     expect(note.folder).toBe("3-Permanent");
   });
 
-  it("populates links from wikilinks", () => {
+  it("populates links from wikilinks when targets exist", () => {
+    // Create both source and target notes so wikilinks resolve
+    writeFixture(vault, "1-Fleeting/Знання як процес.md", FLEETING_NOTE);
+    writeFixture(vault, "3-Permanent/note.md", PERMANENT_NOTE);
+    db = new ZkDatabase(vault);
+    // Index target first so it's resolvable
+    db.indexNote("1-Fleeting/Знання як процес.md");
+    db.indexNote("3-Permanent/note.md");
+    const links = db.getLinksFrom("3-Permanent/note.md");
+    expect(links.length).toBeGreaterThan(0);
+  });
+
+  it("skips links when target note does not exist", () => {
     writeFixture(vault, "3-Permanent/note.md", PERMANENT_NOTE);
     db = new ZkDatabase(vault);
     db.indexNote("3-Permanent/note.md");
     const links = db.getLinksFrom("3-Permanent/note.md");
-    expect(links.length).toBeGreaterThan(0);
+    expect(links.length).toBe(0);
   });
 });
 

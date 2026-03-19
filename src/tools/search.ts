@@ -1,4 +1,5 @@
 import { ZkDatabase } from "../db/index.js";
+import { CONFIG } from "../config.js";
 
 export function zkFindConnections(db: ZkDatabase, args: { note_path?: string; note_title?: string }) {
   let notePath = args.note_path;
@@ -41,7 +42,7 @@ export function zkClusterDetect(db: ZkDatabase) {
 
   const clusters: { tag: string; notes: string[]; hasMoc: boolean }[] = [];
   for (const [tag, titles] of tagGroups) {
-    if (titles.length >= 3) {
+    if (titles.length >= CONFIG.MIN_CLUSTER_SIZE) {
       clusters.push({
         tag,
         notes: titles,

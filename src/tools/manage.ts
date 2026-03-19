@@ -2,6 +2,7 @@ import { ZkDatabase } from "../db/index.js";
 import { updateFrontmatterField, updateSection, moveNote, deleteNote } from "../vault/writer.js";
 import { join } from "node:path";
 import { compareLuhmannIds, buildTree, renderTree, getContext, getParentId } from "../luhmann.js";
+import { CONFIG } from "../config.js";
 
 export function zkFindById(db: ZkDatabase, zkId: string) {
   const note = db.getNoteById(zkId);
@@ -15,7 +16,7 @@ export function zkTree(db: ZkDatabase, opts: { root_id?: string; context_id?: st
   ).all() as { zk_id: string; title: string; status: string; path: string }[];
   rows.sort((a, b) => compareLuhmannIds(a.zk_id, b.zk_id));
 
-  const depth = opts.depth ?? 5;
+  const depth = opts.depth ?? CONFIG.DEFAULT_TREE_DEPTH;
   const hints = `\n→ zk_find_by_id { id: "X" } to read a note\n→ zk_tree { context_id: "X" } to explore around a note`;
 
   if (opts.context_id) {

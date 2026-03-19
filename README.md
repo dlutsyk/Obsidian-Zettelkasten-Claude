@@ -114,7 +114,7 @@ Claude Code ←→ MCP Server (obsidian-zk serve) ←→ SQLite DB + Vault files
 **Analysis:**
 
 - `zk_list` — filter notes by type/status/folder
-- `zk_unprocessed` — notes needing processing with age and urgency tiers
+- `zk_unprocessed` — notes needing processing with age tracking
 - `zk_orphans` — notes with no incoming links
 - `zk_finalize` — quality-check permanent notes (connections, claim, evidence, confidence)
 - `zk_next_id` — next Luhmann ID
@@ -127,7 +127,11 @@ Claude Code ←→ MCP Server (obsidian-zk serve) ←→ SQLite DB + Vault files
 - `zk_reindex` — full vault re-scan
 - `zk_status` — DB stats
 
-### Database schema
+### Database & indexing
+
+The vault is markdown files. Without a DB, every operation (find connections, list unprocessed, detect orphans) would scan and parse every `.md` file. The SQLite DB is a **read-optimized index** over the vault.
+
+**Schema:**
 
 ```sql
 CREATE TABLE notes (
@@ -141,9 +145,39 @@ CREATE TABLE links (
   source TEXT, target TEXT, link_type TEXT,
   PRIMARY KEY (source, target)
 );
+
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 ```
 
-Links use **path-based resolution** — wikilink titles resolved to file paths during indexing. Incremental indexing via `content_hash`; single-note `indexNote()` for CRUD ops, full `reindex()` for vault scans.
+**What it accelerates:**
+
+| Operation | Without DB | With DB |
+|-----------|-----------|---------|
+| Find by zk_id | Scan all files, parse YAML | Single indexed query |
+| List unprocessed | Scan + parse + filter | `WHERE status IN ('unprocessed','draft')` |
+| Find orphans | Parse all files, build link graph | `LEFT JOIN links ... WHERE target IS NULL` |
+| Find connections | Parse all, compare tags/keywords pairwise | Load pre-extracted tags/summary, score in-memory |
+| Detect clusters | Same | Group pre-extracted tags |
+
+**Incremental indexing via `content_hash`:**
+
+1. `scanVault()` walks all `.md` files
+2. Compute MD5 of each file's content
+3. Compare with stored `content_hash` — **only re-parse changed files**
+4. A 10K vault where 3 files changed → only 3 files re-parsed
+
+**Staleness check (`ensureFresh()`):**
+
+Read-only tools (list, tree, orphans) call `ensureFresh()` instead of full `reindex()`:
+- Compares file `mtime` against `last_index` timestamp
+- If nothing changed between tool calls → **zero work**
+- If vault was edited in Obsidian → triggers incremental reindex
+
+**Link validation:**
+
+Wikilinks (`[[Note Title]]`) only create a DB link if the target note exists in the `notes` table. Unresolvable links are skipped — no phantom entries in orphan detection or backlinks.
+
+**Write-path tools** (`zk_capture`, `zk_permanent`, etc.) call `indexNote()` on the affected file directly — no full vault scan needed.
 
 ## Zettelkasten method
 

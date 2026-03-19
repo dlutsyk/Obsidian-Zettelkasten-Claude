@@ -1,7 +1,7 @@
 import { ZkDatabase } from "../db/index.js";
 
 export function zkUnprocessed(db: ZkDatabase, args: { type?: string }) {
-  db.reindex();
+  db.ensureFresh();
   const notes = db.getUnprocessed(args.type);
   const now = new Date();
 
@@ -16,10 +16,6 @@ export function zkUnprocessed(db: ZkDatabase, args: { type?: string }) {
       age_days = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    let urgency: "normal" | "warning" | "critical" = "normal";
-    if (age_days > 14) urgency = "critical";
-    else if (age_days > 7) urgency = "warning";
-
     grouped[folder].push({
       title: note.title,
       path: note.path,
@@ -27,7 +23,6 @@ export function zkUnprocessed(db: ZkDatabase, args: { type?: string }) {
       date: note.created,
       type: note.type,
       age_days,
-      urgency,
     });
   }
 
@@ -39,7 +34,7 @@ export function zkUnprocessed(db: ZkDatabase, args: { type?: string }) {
 }
 
 export function zkOrphans(db: ZkDatabase, args: { folder?: string }) {
-  db.reindex();
+  db.ensureFresh();
   const orphans = db.getOrphans(args.folder);
   return orphans.map((n: any) => ({
     title: n.title,
@@ -50,7 +45,7 @@ export function zkOrphans(db: ZkDatabase, args: { folder?: string }) {
 }
 
 export function zkReview(db: ZkDatabase) {
-  db.reindex();
+  db.ensureFresh();
 
   const unprocessedFleeting = db.getUnprocessed("fleeting");
   const unprocessedLiterature = db.getUnprocessed("literature");

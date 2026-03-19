@@ -2,7 +2,7 @@
  * MCP server — tool + prompt registration.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { ZkDatabase } from "../db/index.js";
 import { zkCapture } from "../tools/capture.js";
 import { zkLiterature } from "../tools/literature.js";
@@ -15,6 +15,28 @@ import { zkMoc } from "../tools/moc.js";
 import { zkProject } from "../tools/project.js";
 import { zkBacklinks } from "../tools/backlinks.js";
 import { nextId } from "../luhmann.js";
+import { CONFIG } from "../config.js";
+
+/** Format Zod validation errors into a structured response. */
+function formatZodError(err: ZodError): string {
+  const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+  return JSON.stringify({ error: "Validation failed", issues }, null, 2);
+}
+
+/** Wrap a tool handler with structured error handling. */
+function wrapHandler(fn: (args: any) => any) {
+  return async (args: any) => {
+    try {
+      const result = fn(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    } catch (err: any) {
+      if (err instanceof ZodError) {
+        return { content: [{ type: "text" as const, text: formatZodError(err) }], isError: true };
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify({ error: err.message }) }], isError: true };
+    }
+  };
+}
 
 export function createServer(vaultRoot: string): McpServer {
   const db = new ZkDatabase(vaultRoot);
@@ -39,10 +61,7 @@ export function createServer(vaultRoot: string): McpServer {
         tags: z.array(z.string()).optional().describe("Tags beyond 'fleeting'"),
       },
     },
-    async (args) => {
-      const result = zkCapture(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkCapture(db, args))
   );
 
   server.registerTool(
@@ -69,10 +88,7 @@ export function createServer(vaultRoot: string): McpServer {
         connections: z.array(z.object({ target: z.string(), type: z.string() })).optional(),
       },
     },
-    async (args) => {
-      const result = zkLiterature(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkLiterature(db, args))
   );
 
   server.registerTool(
@@ -94,10 +110,7 @@ export function createServer(vaultRoot: string): McpServer {
         source_literature_path: z.string().optional().describe("Path of source literature note to mark as processed"),
       },
     },
-    async (args) => {
-      const result = zkPermanent(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkPermanent(db, args))
   );
 
   server.registerTool(
@@ -111,24 +124,14 @@ export function createServer(vaultRoot: string): McpServer {
         sections: z.record(z.string(), z.string()).optional().describe("Body sections to update (for edit action) — key is section header, value is new content"),
       },
     },
-    async (args) => {
-      let result: any;
+    wrapHandler((args) => {
       switch (args.action) {
-        case "find":
-          result = zkFindById(db, args.zk_id);
-          break;
-        case "edit":
-          result = zkEditNote(db, args.zk_id, (args.updates ?? {}) as Record<string, string>, (args.sections as Record<string, string>) ?? undefined);
-          break;
-        case "archive":
-          result = zkArchiveNote(db, args.zk_id);
-          break;
-        case "delete":
-          result = zkDeleteNote(db, args.zk_id);
-          break;
+        case "find": return zkFindById(db, args.zk_id);
+        case "edit": return zkEditNote(db, args.zk_id, (args.updates ?? {}) as Record<string, string>, (args.sections as Record<string, string>) ?? undefined);
+        case "archive": return zkArchiveNote(db, args.zk_id);
+        case "delete": return zkDeleteNote(db, args.zk_id);
       }
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    })
   );
 
   server.registerTool(
@@ -196,10 +199,7 @@ export function createServer(vaultRoot: string): McpServer {
         note_paths: z.array(z.string()).optional().describe("Explicit note paths to include"),
       },
     },
-    async (args) => {
-      const result = zkMoc(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkMoc(db, args))
   );
 
   // === NEW: PROJECT TOOL ===
@@ -217,10 +217,7 @@ export function createServer(vaultRoot: string): McpServer {
         deadline: z.string().optional().describe("Deadline date YYYY-MM-DD"),
       },
     },
-    async (args) => {
-      const result = zkProject(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkProject(db, args))
   );
 
   // === NEW: BACKLINKS TOOL ===
@@ -235,10 +232,7 @@ export function createServer(vaultRoot: string): McpServer {
         zk_id: z.string().optional().describe("Luhmann ZK ID"),
       },
     },
-    async (args) => {
-      const result = zkBacklinks(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkBacklinks(db, args))
   );
 
   // === NEW: FINALIZE TOOL ===
@@ -251,10 +245,7 @@ export function createServer(vaultRoot: string): McpServer {
         zk_id: z.string().describe("Luhmann ZK ID of the note to finalize"),
       },
     },
-    async (args) => {
-      const result = zkFinalize(db, args.zk_id);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkFinalize(db, args.zk_id))
   );
 
   // === SEARCH & CONNECTIONS ===
@@ -268,10 +259,7 @@ export function createServer(vaultRoot: string): McpServer {
         note_title: z.string().optional().describe("Note title (alternative to path)"),
       },
     },
-    async (args) => {
-      const result = zkFindConnections(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkFindConnections(db, args))
   );
 
   server.registerTool(
@@ -280,10 +268,7 @@ export function createServer(vaultRoot: string): McpServer {
       description: "Find emerging themes — groups of notes sharing tags without a MOC",
       inputSchema: {},
     },
-    async () => {
-      const result = zkClusterDetect(db);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler(() => zkClusterDetect(db))
   );
 
   // === VAULT ANALYSIS ===
@@ -299,7 +284,7 @@ export function createServer(vaultRoot: string): McpServer {
       },
     },
     async (args) => {
-      db.reindex();
+      db.ensureFresh();
       const notes = db.listNotes(args);
       return { content: [{ type: "text" as const, text: JSON.stringify(notes, null, 2) }] };
     }
@@ -308,15 +293,12 @@ export function createServer(vaultRoot: string): McpServer {
   server.registerTool(
     "zk_unprocessed",
     {
-      description: "Find notes needing processing — includes age and urgency (>7d warning, >14d critical)",
+      description: "Find notes needing processing — includes age_days since creation",
       inputSchema: {
         type: z.string().optional().describe("Filter by type: fleeting, literature, permanent"),
       },
     },
-    async (args) => {
-      const result = zkUnprocessed(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkUnprocessed(db, args))
   );
 
   server.registerTool(
@@ -327,10 +309,7 @@ export function createServer(vaultRoot: string): McpServer {
         folder: z.string().optional().describe("Filter by folder, e.g. '3-Permanent'"),
       },
     },
-    async (args) => {
-      const result = zkOrphans(db, args);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler((args) => zkOrphans(db, args))
   );
 
   server.registerTool(
@@ -342,7 +321,7 @@ export function createServer(vaultRoot: string): McpServer {
       },
     },
     async (args) => {
-      db.reindex();
+      db.ensureFresh();
       const ids = db.getAllZkIds();
       const id = nextId(new Set(ids.keys()), args.parent_id);
       return { content: [{ type: "text" as const, text: JSON.stringify({ next_id: id }) }] };
@@ -370,11 +349,11 @@ export function createServer(vaultRoot: string): McpServer {
       inputSchema: {
         root_id: z.string().optional().describe("Show subtree from this ID"),
         context_id: z.string().optional().describe("Show ancestors, siblings, children of this note"),
-        depth: z.number().optional().describe("Max depth (default 5)"),
+        depth: z.number().optional().describe(`Max depth (default ${CONFIG.DEFAULT_TREE_DEPTH})`),
       },
     },
     async (args) => {
-      db.reindex();
+      db.ensureFresh();
       const result = zkTree(db, args);
       return { content: [{ type: "text" as const, text: result }] };
     }
@@ -386,10 +365,7 @@ export function createServer(vaultRoot: string): McpServer {
       description: "Full vault health report — unprocessed, orphans, stats",
       inputSchema: {},
     },
-    async () => {
-      const result = zkReview(db);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler(() => zkReview(db))
   );
 
   // === INDEX MANAGEMENT ===
@@ -400,10 +376,7 @@ export function createServer(vaultRoot: string): McpServer {
       description: "Full vault re-scan and DB update",
       inputSchema: {},
     },
-    async () => {
-      const result = zkReindex(db);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler(() => zkReindex(db))
   );
 
   server.registerTool(
@@ -412,10 +385,7 @@ export function createServer(vaultRoot: string): McpServer {
       description: "DB stats and last index time",
       inputSchema: {},
     },
-    async () => {
-      const result = zkStatus(db);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    }
+    wrapHandler(() => zkStatus(db))
   );
 
   return server;
