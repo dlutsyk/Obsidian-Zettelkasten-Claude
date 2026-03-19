@@ -1,40 +1,14 @@
 /**
- * Scaffold vault — copy templates, create folders, configure MCP.
+ * Scaffold vault — create folder structure, config, .gitignore, .mcp.json, then sync via update.
  */
-import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { WizardAnswers } from "./wizard.js";
+import { writeConfig } from "./utils.js";
+import { update } from "./updater.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-function getTemplatesDir(): string {
-  // In dist: dist/init/scaffold.js → ../../templates
-  // In src: src/init/scaffold.ts → ../../templates
-  let dir = resolve(__dirname, "../../templates");
-  if (!existsSync(dir)) {
-    dir = resolve(__dirname, "../../../templates");
-  }
-  return dir;
-}
-
-function copyDirRecursive(src: string, dest: string) {
-  if (!existsSync(src)) return;
-  mkdirSync(dest, { recursive: true });
-  for (const entry of readdirSync(src, { withFileTypes: true })) {
-    const srcPath = join(src, entry.name);
-    const destPath = join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirRecursive(srcPath, destPath);
-    } else {
-      copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-export function scaffold(answers: WizardAnswers) {
+export async function scaffold(answers: WizardAnswers) {
   const vault = resolve(answers.vaultPath);
-  const templatesDir = getTemplatesDir();
 
   console.log(`\nScaffolding vault at: ${vault}\n`);
 
@@ -48,52 +22,16 @@ export function scaffold(answers: WizardAnswers) {
     }
   }
 
-  // 2. Copy note templates
-  const noteTemplatesDir = join(templatesDir, "vault-folders", "Templates");
-  if (existsSync(noteTemplatesDir)) {
-    const destTemplates = join(vault, "Templates");
-    copyDirRecursive(noteTemplatesDir, destTemplates);
-    console.log("  Copied note templates");
-  }
-
-  // 3. Copy skills + agents
-  if (answers.installSkills) {
-    const skillsSrc = join(templatesDir, "claude", "skills");
-    const agentsSrc = join(templatesDir, "claude", "agents");
-    const claudeDir = join(vault, ".claude");
-
-    if (existsSync(skillsSrc)) {
-      copyDirRecursive(skillsSrc, join(claudeDir, "skills"));
-      console.log("  Installed skills");
-    }
-    if (existsSync(agentsSrc)) {
-      copyDirRecursive(agentsSrc, join(claudeDir, "agents"));
-      console.log("  Installed agents");
-    }
-  }
-
-  // 4. Create/update CLAUDE.md
-  const claudeMdTemplate = join(templatesDir, "CLAUDE.md.template");
-  const claudeMdDest = join(vault, "CLAUDE.md");
-  if (existsSync(claudeMdTemplate)) {
-    let content = readFileSync(claudeMdTemplate, "utf-8");
-    content = content.replace(/\{\{language\}\}/g, answers.language);
-    if (!existsSync(claudeMdDest)) {
-      writeFileSync(claudeMdDest, content, "utf-8");
-      console.log("  Created CLAUDE.md");
-    } else {
-      console.log("  CLAUDE.md exists — skipping (run 'obsidian-zk update' to sync)");
-    }
-  }
-
-  // 5. Create .zk/ directory
+  // 2. Create .zk/ + save config
   const zkDir = join(vault, ".zk");
   if (!existsSync(zkDir)) {
     mkdirSync(zkDir, { recursive: true });
     console.log("  Created .zk/ (database directory)");
   }
+  writeConfig(vault, { language: answers.language, installSkills: answers.installSkills });
+  console.log("  Saved config");
 
-  // 6. Update .gitignore
+  // 3. Update .gitignore
   const gitignorePath = join(vault, ".gitignore");
   const gitignoreEntries = [".zk/"];
   if (existsSync(gitignorePath)) {
@@ -108,7 +46,7 @@ export function scaffold(answers: WizardAnswers) {
     console.log("  Created .gitignore");
   }
 
-  // 7. Configure MCP server in .mcp.json
+  // 4. Configure MCP server in .mcp.json
   const mcpPath = join(vault, ".mcp.json");
   let mcpConfig: any = {};
   if (existsSync(mcpPath)) {
@@ -126,5 +64,8 @@ export function scaffold(answers: WizardAnswers) {
   writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2) + "\n", "utf-8");
   console.log("  Configured MCP server in .mcp.json");
 
-  console.log("\n✅ Done! Run `/zk:capture` in Claude Code to start.\n");
+  // 5. Sync templates, skills, agents, CLAUDE.md, DB via update
+  await update(vault, { skipPrompt: true });
+
+  console.log("✅ Done! Run `/zk:capture` in Claude Code to start.\n");
 }

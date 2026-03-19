@@ -12,8 +12,10 @@ async function main() {
     case "init": {
       const { runWizard } = await import("../init/wizard.js");
       const { scaffold } = await import("../init/scaffold.js");
-      const answers = await runWizard(process.cwd());
-      scaffold(answers);
+      const vaultFlag = args.indexOf("--vault");
+      const defaultVault = vaultFlag >= 0 ? args[vaultFlag + 1] : process.cwd();
+      const answers = await runWizard(defaultVault);
+      await scaffold(answers);
       break;
     }
 
@@ -21,7 +23,8 @@ async function main() {
       const { update } = await import("../init/updater.js");
       const vaultFlag = args.indexOf("--vault");
       const vaultPath = vaultFlag >= 0 ? args[vaultFlag + 1] : ".";
-      update(vaultPath);
+      const yesFlag = args.includes("--yes");
+      await update(vaultPath, { yes: yesFlag });
       break;
     }
 
