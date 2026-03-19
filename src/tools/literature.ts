@@ -1,6 +1,11 @@
 import { ZkDatabase } from "../db/index.js";
 import { createNote } from "../vault/writer.js";
 
+export interface ReadingNoteChapter {
+  chapter: string;
+  notes: string[];
+}
+
 export interface LiteratureArgs {
   title: string;
   source_type: string;
@@ -9,6 +14,7 @@ export interface LiteratureArgs {
   source_url?: string;
   source_year?: string;
   summary: string;
+  reading_notes?: (string | ReadingNoteChapter)[];
   key_ideas: string[];
   quotes?: string[];
   interpretation?: string;
@@ -34,6 +40,13 @@ export function zkLiterature(db: ZkDatabase, args: LiteratureArgs) {
   if (args.source_year) fm.source_year = args.source_year;
   fm.aliases = [];
 
+  const readingNotes = (args.reading_notes ?? []).map((item) => {
+    if (typeof item === "string") return item;
+    const header = `### ${item.chapter}`;
+    const bullets = item.notes.map((n) => `- ${n}`).join("\n");
+    return `${header}\n\n${bullets}`;
+  }).join("\n\n");
+
   const keyIdeas = args.key_ideas.map((idea, i) => `${i + 1}. ${idea}`).join("\n");
   const quotes = (args.quotes ?? []).map((q) => `> "${q}"`).join("\n\n");
   const takeaways = (args.takeaways ?? []).map((t) => `- [ ] ${t}`).join("\n");
@@ -47,6 +60,10 @@ export function zkLiterature(db: ZkDatabase, args: LiteratureArgs) {
 ## Summary (Резюме)
 
 ${args.summary}
+
+## Reading Notes (Нотатки під час читання)
+
+${readingNotes}
 
 ## Key Ideas (Ключові ідеї)
 

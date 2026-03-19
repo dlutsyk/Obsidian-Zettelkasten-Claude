@@ -57,6 +57,10 @@ export function createServer(vaultRoot: string): McpServer {
         source_url: z.string().optional(),
         source_year: z.string().optional(),
         summary: z.string().describe("2-3 sentence summary in Ukrainian"),
+        reading_notes: z.array(z.union([
+          z.string(),
+          z.object({ chapter: z.string(), notes: z.array(z.string()) }),
+        ])).optional().describe("Raw reading notes — strings or {chapter, notes[]} for books"),
         key_ideas: z.array(z.string()).describe("Key ideas from the source"),
         quotes: z.array(z.string()).optional(),
         interpretation: z.string().optional(),

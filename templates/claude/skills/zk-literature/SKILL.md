@@ -14,6 +14,8 @@ Create a literature note from user-pasted source content.
    - **Optional:** URL, year
 2. Generate a descriptive Ukrainian title (or use source title)
 3. Analyze the pasted content — identify key ideas, quotes, actionable takeaways
+   - For books: capture reading notes per chapter via `reading_notes` with `{chapter, notes[]}` objects
+   - For shorter sources: use plain string array for `reading_notes` if relevant observations exist
 4. Use `zk_find_connections` MCP tool to find related notes
 5. Auto-classify each connection: Підтримує, Суперечить, Розширює, Пов'язано
 6. Build draft and present for review — explain each connection choice
