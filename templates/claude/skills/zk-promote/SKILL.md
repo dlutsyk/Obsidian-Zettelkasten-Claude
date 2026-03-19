@@ -36,6 +36,7 @@ Convert fleeting and literature notes into atomic permanent notes.
 
 - Never force promotion — some ideas aren't ready
 - If 2+ ideas in one fleeting → 2+ permanent notes
+- Carry relevant tags from source note to permanent. Refine if needed
 - Each permanent must have typed connections
 - All content in Ukrainian
 - Always link permanent → source note in Origin section

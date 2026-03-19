@@ -21,5 +21,5 @@ Create a fleeting note from a raw thought or observation.
 - All note content in Ukrainian
 - Title: descriptive Ukrainian phrase
 - One thought per note
-- `fleeting` tag always first
+- Check `zk_status` for existing tags. 2-3 content tags. Reuse existing
 - Remind user: fleeting notes expire in 1-2 weeks, use `/zk:promote` to convert

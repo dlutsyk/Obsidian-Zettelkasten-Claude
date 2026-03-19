@@ -153,6 +153,37 @@ describe("query methods", () => {
   });
 });
 
+describe("getAllTags", () => {
+  beforeEach(() => { db = seedAndIndex(vault); });
+
+  it("returns tags sorted by frequency", () => {
+    const tags = db.getAllTags();
+    expect(tags.length).toBeGreaterThan(0);
+    // Should be sorted descending by count
+    for (let i = 1; i < tags.length; i++) {
+      expect(tags[i - 1].count).toBeGreaterThanOrEqual(tags[i].count);
+    }
+  });
+
+  it("counts tags correctly", () => {
+    const tags = db.getAllTags();
+    const epist = tags.find((t) => t.tag === "epistemology");
+    // fleeting + 2 permanent + literature + MOC = 5 notes with epistemology
+    expect(epist).toBeTruthy();
+    expect(epist!.count).toBe(5);
+  });
+
+  it("excludes type tags", () => {
+    const tags = db.getAllTags();
+    const names = tags.map((t) => t.tag);
+    expect(names).not.toContain("fleeting");
+    expect(names).not.toContain("permanent");
+    expect(names).not.toContain("literature");
+    expect(names).not.toContain("MOC");
+    expect(names).not.toContain("project");
+  });
+});
+
 describe("findConnections", () => {
   beforeEach(() => { db = seedAndIndex(vault); });
 

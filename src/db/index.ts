@@ -433,6 +433,19 @@ export class ZkDatabase {
     if (this.needsReindex()) this.reindex();
   }
 
+  getAllTags(): { tag: string; count: number }[] {
+    const rows = this.db.prepare("SELECT tags FROM notes").all() as { tags: string }[];
+    const freq = new Map<string, number>();
+    for (const { tags } of rows) {
+      for (const t of JSON.parse(tags || "[]")) {
+        freq.set(t, (freq.get(t) ?? 0) + 1);
+      }
+    }
+    return [...freq.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
   getStats() {
     const total = (this.db.prepare("SELECT COUNT(*) as c FROM notes").get() as any).c;
     const byType = this.db.prepare("SELECT type, COUNT(*) as c FROM notes GROUP BY type").all() as any[];

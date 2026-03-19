@@ -10,5 +10,5 @@ export function zkReindex(db: ZkDatabase) {
 
 export function zkStatus(db: ZkDatabase) {
   const stats = db.getStats();
-  return stats;
+  return { ...stats, tags: db.getAllTags() };
 }

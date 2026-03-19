@@ -58,6 +58,15 @@ The vault uses the `ozc` MCP server for all Zettelkasten operations. Tools are a
 
 - **Підтримує** (Supports), **Суперечить** (Contradicts), **Розширює** (Extends), **Пов'язано** (Related)
 
+## Tags
+
+- Type tags (`fleeting`, `permanent`, `literature`, `MOC`, `project`) auto-added — never add manually
+- Before adding tags, check existing tags via `zk_status` — reuse over inventing
+- Tags lowercase, hyphenated: `machine-learning`, `когнітивне-навантаження`
+- Domain tags in {{language}}; tech/framework names stay English (`react`, `api`, `llm`)
+- 2-4 content tags per note (excluding type tag)
+- Prefer specific over generic: `spaced-repetition` > `навчання`
+
 ## Language
 
 All note content, section headers, and connection types in Ukrainian.

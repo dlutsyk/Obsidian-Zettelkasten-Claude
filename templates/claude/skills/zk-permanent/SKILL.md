@@ -25,6 +25,7 @@ Create an atomic permanent note — one idea, one note, with typed connections.
 - ONE idea per note — split if multiple emerge
 - Title IS the idea (descriptive phrase, not generic label)
 - Must have at least one typed connection
+- `permanent` auto-added. Inherit relevant tags from source note. Refine. Check `zk_status` first
 - Confidence: `low` = untested, `medium` = some evidence, `high` = well-supported
 - Always link back to origin note in Походження section
 - Status starts as `draft`

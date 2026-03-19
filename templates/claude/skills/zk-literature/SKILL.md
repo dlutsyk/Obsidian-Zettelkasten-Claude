@@ -31,5 +31,5 @@ After creating the note, present:
 - All note content in Ukrainian
 - NEVER copy-paste from source — always rephrase
 - source_type must be Ukrainian: книга, стаття, відео, подкаст
-- `literature` tag always first
+- `literature` auto-added. Add 2-4 domain tags. Check `zk_status` first
 - Status: `unprocessed` until user extracts permanent notes
